@@ -1,4 +1,4 @@
-import { Lead, Course, Event, Payment, InventoryItem } from './src/types';
+import { Lead, Course, Event, Payment, InventoryItem } from './types';
 
 export const TEACHERS_LIST = [
   "Fasoli Daniele", "Fedele Laura", "Ferrara Fabrizio", "Ferri Max", "Fincato Camilla",

@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          '@': path.resolve(__dirname, '.'),
+          // CORREZIONE CRITICA: Ora @ punta direttamente dentro src
+          '@': path.resolve(__dirname, './src'),
         }
       }
     };

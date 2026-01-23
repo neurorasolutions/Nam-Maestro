@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { View, Role } from '@/src/types';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import CalendarView from '@/components/CalendarView';
-import CrmView from '@/components/CrmView';
-import DidacticsView from '@/components/DidacticsView';
-import AdminView from '@/components/AdminView';
-import WarehouseView from '@/components/WarehouseView';
-import StudentsView from '@/components/StudentsView';
-import ReportsView from '@/components/ReportsView';
-import LoginScreen from '@/components/LoginScreen';
-import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { View, Role } from './types';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import CalendarView from './components/CalendarView';
+import CrmView from './components/CrmView';
+import DidacticsView from './components/DidacticsView';
+import AdminView from './components/AdminView';
+import WarehouseView from './components/WarehouseView';
+import StudentsView from './components/StudentsView';
+import ReportsView from './components/ReportsView';
+// IMPORTANTE: Usiamo il nuovo nome per sbloccare Git
+import AuthLogin from './components/AuthLogin';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Questo componente gestisce il contenuto: Login o Gestionale?
 const AppContent: React.FC = () => {
@@ -28,9 +29,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // 2. Se NON c'è sessione, mostra la schermata di Login
+  // 2. Se NON c'è sessione, mostra la schermata di Login (Nuovo Componente)
   if (!session) {
-    return <LoginScreen />;
+    return <AuthLogin />;
   }
 
   // 3. Se siamo qui, l'utente è loggato: Mostra il Gestionale
