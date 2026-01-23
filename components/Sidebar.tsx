@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from '../types';
+import { View } from '../src/types';
 
 interface SidebarProps {
   activeView: View;

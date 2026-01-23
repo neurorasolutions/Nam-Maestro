@@ -1,5 +1,5 @@
 import React from 'react';
-import { Role } from '../types';
+import { Role } from '../src/types';
 
 interface HeaderProps {
   role: Role;

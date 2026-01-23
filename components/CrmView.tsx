@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { INITIAL_LEADS } from '../constants';
-import { Lead } from '../types';
+import { Lead } from '../src/types';
 
 const CrmView: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS);

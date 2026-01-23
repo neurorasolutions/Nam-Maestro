@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Role } from '../types';
+import { Role } from '../src/types';
 
 interface AdminViewProps {
   role: Role;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { COURSES } from '../constants';
-import { Course } from '../types';
+import { Course } from '../src/types';
 
 // Extended Mock Data for the Detail Modal
 const COURSE_DETAILS: Record<number, {
