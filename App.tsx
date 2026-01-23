@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Role } from './src/types';
+import { View, Role } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import CalendarView from './components/CalendarView';
