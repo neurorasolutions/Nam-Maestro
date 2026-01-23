@@ -16,20 +16,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Controllo iniziale all'avvio dell'app
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    setLoading(true);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
     });
 
-    // 2. Ascolto attivo dei cambiamenti (login, logout, refresh)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
-
+    // Pulisce il listener quando il componente viene smontato
     return () => subscription.unsubscribe();
   }, []);
 
@@ -39,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
