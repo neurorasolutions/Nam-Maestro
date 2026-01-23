@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
 // Vite usa import.meta.env per le variabili d'ambiente
@@ -9,4 +10,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Mancano le variabili d\'ambiente di Supabase (VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY)');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);git add .
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
