@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '@/src/lib/supabaseClient';
 
-const LoginView: React.FC = () => {
+const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -121,4 +121,4 @@ const LoginView: React.FC = () => {
   );
 };
 
-export default LoginView;
+export default LoginScreen;

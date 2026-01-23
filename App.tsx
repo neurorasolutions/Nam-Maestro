@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { View, Role } from './src/types';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import CalendarView from './components/CalendarView';
-import CrmView from './components/CrmView';
-import DidacticsView from './components/DidacticsView';
-import AdminView from './components/AdminView';
-import WarehouseView from './components/WarehouseView';
-import StudentsView from './components/StudentsView';
-import ReportsView from './components/ReportsView';
-import LoginScreen from './components/LoginScreen';
-import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { View, Role } from '@/src/types';
+import Sidebar from '@/components/Sidebar';
+import Header from '@/components/Header';
+import CalendarView from '@/components/CalendarView';
+import CrmView from '@/components/CrmView';
+import DidacticsView from '@/components/DidacticsView';
+import AdminView from '@/components/AdminView';
+import WarehouseView from '@/components/WarehouseView';
+import StudentsView from '@/components/StudentsView';
+import ReportsView from '@/components/ReportsView';
+import LoginScreen from '@/components/LoginScreen';
+import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 
 // Questo componente gestisce il contenuto: Login o Gestionale?
 const AppContent: React.FC = () => {
