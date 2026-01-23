@@ -9,8 +9,8 @@ import AdminView from './components/AdminView';
 import WarehouseView from './components/WarehouseView';
 import StudentsView from './components/StudentsView';
 import ReportsView from './components/ReportsView';
-// Importiamo i componenti di sicurezza
-import LoginView from './components/LoginView';
+// MODIFICA CRITICA: Importiamo LoginScreen invece di LoginView
+import LoginScreen from './components/LoginScreen';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Questo componente gestisce il contenuto: Login o Gestionale?
@@ -29,9 +29,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // 2. Se NON c'è sessione, mostra il Login
+  // 2. Se NON c'è sessione, mostra la schermata di Login
   if (!session) {
-    return <LoginView />;
+    return <LoginScreen />;
   }
 
   // 3. Se siamo qui, l'utente è loggato: Mostra il Gestionale
