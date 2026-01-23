@@ -9,12 +9,32 @@ import AdminView from './components/AdminView';
 import WarehouseView from './components/WarehouseView';
 import StudentsView from './components/StudentsView';
 import ReportsView from './components/ReportsView';
+// Importiamo i componenti di sicurezza
+import LoginView from './components/LoginView';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-const App: React.FC = () => {
+// Questo componente gestisce il contenuto: Login o Gestionale?
+const AppContent: React.FC = () => {
+  const { session, loading } = useAuth();
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [role, setRole] = useState<Role>('direzione');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  // 1. Se sta caricando (controlla se c'è sessione), mostra attesa
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-nam-login-bg text-white">
+        Caricamento...
+      </div>
+    );
+  }
+
+  // 2. Se NON c'è sessione, mostra il Login
+  if (!session) {
+    return <LoginView />;
+  }
+
+  // 3. Se siamo qui, l'utente è loggato: Mostra il Gestionale
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
@@ -38,7 +58,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-nam-bg overflow-hidden">
-      {/* Sidebar - Conditionally Rendered */}
+      {/* Sidebar */}
       {isSidebarOpen && (
         <Sidebar activeView={activeView} onViewChange={setActiveView} />
       )}
@@ -56,6 +76,15 @@ const App: React.FC = () => {
         </main>
       </div>
     </div>
+  );
+};
+
+// App Principale che avvolge tutto con il Guardiano (AuthProvider)
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
