@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '@/src/lib/supabaseClient';
-
+import { supabase } from '../lib/supabaseClient';
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
