@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Role } from './types';
+import { View, Role } from './src/types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import CalendarView from './components/CalendarView';
@@ -9,9 +9,8 @@ import AdminView from './components/AdminView';
 import WarehouseView from './components/WarehouseView';
 import StudentsView from './components/StudentsView';
 import ReportsView from './components/ReportsView';
-// MODIFICA CRITICA: Importiamo LoginScreen invece di LoginView
 import LoginScreen from './components/LoginScreen';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Questo componente gestisce il contenuto: Login o Gestionale?
 const AppContent: React.FC = () => {
