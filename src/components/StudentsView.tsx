@@ -1,14 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { LISTS } from '../constants';
 import { Student } from '../types';
 
 const StudentsView: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'list' | 'create'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
   const [activeTab, setActiveTab] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Stato per la Lista
+  const [students, setStudents] = useState<Student[]>([]);
+  const [filters, setFilters] = useState({
+    search: '',
+    course: '',
+    type: ''
+  });
 
   // Stato iniziale vuoto per il form
   const initialFormState: Partial<Student> = {
@@ -20,7 +28,67 @@ const StudentsView: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<Student>>(initialFormState);
 
-  // Gestione Input Generici
+  // --- LOGICA DI CARICAMENTO (READ) ---
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error: any) {
+      console.error('Errore fetch:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carica i dati quando si apre la lista
+  useEffect(() => {
+    if (viewMode === 'list') {
+      fetchStudents();
+    }
+  }, [viewMode]);
+
+  // --- LOGICA FILTRI ---
+  const filteredStudents = students.filter(student => {
+    const searchLower = filters.search.toLowerCase();
+    const matchesSearch = 
+      (student.first_name?.toLowerCase().includes(searchLower) || '') ||
+      (student.last_name?.toLowerCase().includes(searchLower) || '') ||
+      (student.email?.toLowerCase().includes(searchLower) || '') ||
+      (student.city?.toLowerCase().includes(searchLower) || '');
+    
+    const matchesCourse = filters.course ? (student.course_1 === filters.course || student.course_2 === filters.course) : true;
+    const matchesType = filters.type ? student.course_type === filters.type : true;
+
+    return matchesSearch && matchesCourse && matchesType;
+  });
+
+  // --- LOGICA FORM (CREATE & UPDATE) ---
+  
+  const handleEdit = (student: Student) => {
+    setFormData(student);
+    setViewMode('form');
+    setActiveTab(0);
+    setMessage(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questo studente? L'azione è irreversibile.")) return;
+    
+    try {
+      const { error } = await supabase.from('students').delete().eq('id', id);
+      if (error) throw error;
+      setStudents(prev => prev.filter(s => s.id !== id));
+    } catch (error: any) {
+      alert("Errore cancellazione: " + error.message);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
@@ -31,7 +99,6 @@ const StudentsView: React.FC = () => {
     }));
   };
 
-  // Gestione Upload Avatar
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     const file = event.target.files[0];
@@ -53,23 +120,33 @@ const StudentsView: React.FC = () => {
     }
   };
 
-  // Salvataggio Studente
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
     try {
-      const { error } = await supabase.from('students').insert([formData]);
-      if (error) throw error;
+      if (formData.id) {
+        // UPDATE
+        const { error } = await supabase
+          .from('students')
+          .update(formData)
+          .eq('id', formData.id);
+        if (error) throw error;
+        setMessage({ type: 'success', text: 'Studente aggiornato correttamente!' });
+      } else {
+        // CREATE (INSERT)
+        const { error } = await supabase.from('students').insert([formData]);
+        if (error) throw error;
+        setMessage({ type: 'success', text: 'Studente iscritto con successo!' });
+        setFormData(initialFormState); // Reset solo se è un nuovo inserimento
+      }
 
-      setMessage({ type: 'success', text: 'Studente iscritto con successo!' });
-      // Reset form dopo 2 secondi o rimani lì? Per ora resettiamo e torniamo alla lista opzionale
+      // Torna alla lista dopo breve delay opzionale, oppure rimani
       setTimeout(() => {
-        setFormData(initialFormState);
         setViewMode('list');
-        setMessage(null);
-      }, 1500);
+      }, 1000);
+      
     } catch (error: any) {
       setMessage({ type: 'error', text: 'Errore salvataggio: ' + error.message });
     } finally {
@@ -77,11 +154,10 @@ const StudentsView: React.FC = () => {
     }
   };
 
-  // --- RENDERING DEI TAB ---
+  // --- RENDERING DELLE TAB (Uguale a prima) ---
 
   const renderTab1_Anagrafica = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Colonna SX: Foto e Dati Base */}
       <div className="space-y-4">
         <div className="flex items-center space-x-4">
           <div 
@@ -121,7 +197,6 @@ const StudentsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Colonna DX: Nascita */}
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Data di Nascita</label>
@@ -157,7 +232,6 @@ const StudentsView: React.FC = () => {
 
   const renderTab2_Contatti = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Contatti Diretti */}
       <div className="space-y-4">
         <h3 className="font-bold text-nam-blue border-b pb-1">Recapiti</h3>
         <div>
@@ -175,6 +249,8 @@ const StudentsView: React.FC = () => {
           </div>
         </div>
         
+        {/* TODO: Aggiungere PEC quando richiesto */}
+        
         <h3 className="font-bold text-nam-blue border-b pb-1 mt-6">Credenziali Sistema</h3>
         <div className="flex items-center space-x-4">
           <label className="flex items-center space-x-2">
@@ -188,7 +264,6 @@ const StudentsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Residenza */}
       <div className="space-y-4">
         <h3 className="font-bold text-nam-blue border-b pb-1">Residenza</h3>
         <div>
@@ -338,45 +413,186 @@ const StudentsView: React.FC = () => {
     </div>
   );
 
-  // --- RENDER PRINCIPALE ---
-
+  // --- VISTA LISTA ---
   if (viewMode === 'list') {
     return (
-      <div className="p-6">
+      <div className="p-6 h-full flex flex-col">
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Gestione Allievi</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Segreteria Studenti
+            <span className="ml-3 text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              {filteredStudents.length} Iscritti
+            </span>
+          </h1>
           <button 
-            onClick={() => setViewMode('create')}
-            className="bg-nam-red text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center"
+            onClick={() => {
+              setFormData(initialFormState);
+              setViewMode('form');
+            }}
+            className="bg-nam-red text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center transition-colors"
           >
             <i className="fas fa-plus mr-2"></i> Nuovo Iscritto
           </button>
         </div>
         
-        {/* Placeholder Lista */}
-        <div className="bg-white rounded shadow p-10 text-center text-gray-500">
-          <i className="fas fa-user-graduate text-4xl mb-4 text-gray-300"></i>
-          <p>Qui apparirà la lista degli studenti (Prossimo step).</p>
-          <p>Clicca su "Nuovo Iscritto" per testare il form.</p>
+        {/* Filtri */}
+        <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cerca (Nome, Città, Email)</label>
+            <div className="relative">
+              <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+              <input 
+                type="text" 
+                placeholder="Cerca..." 
+                value={filters.search}
+                onChange={(e) => setFilters(prev => ({...prev, search: e.target.value}))}
+                className="w-full pl-10 p-2 border rounded focus:ring-nam-red focus:border-nam-red"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtra per Corso</label>
+            <select 
+              value={filters.course}
+              onChange={(e) => setFilters(prev => ({...prev, course: e.target.value}))}
+              className="w-full p-2 border rounded"
+            >
+              <option value="">Tutti i Corsi</option>
+              {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipologia</label>
+            <select 
+              value={filters.type}
+              onChange={(e) => setFilters(prev => ({...prev, type: e.target.value}))}
+              className="w-full p-2 border rounded"
+            >
+              <option value="">Tutte le Tipologie</option>
+              {LISTS.COURSE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Tabella */}
+        <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col">
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th className="p-4 border-b font-bold text-gray-600 text-sm">Allievo</th>
+                  <th className="p-4 border-b font-bold text-gray-600 text-sm">Corso & Tipo</th>
+                  <th className="p-4 border-b font-bold text-gray-600 text-sm hidden md:table-cell">Stato & Città</th>
+                  <th className="p-4 border-b font-bold text-gray-600 text-sm text-center">Notifiche</th>
+                  <th className="p-4 border-b font-bold text-gray-600 text-sm text-right">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.length > 0 ? (
+                  filteredStudents.map((student) => (
+                    <tr key={student.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-3 flex-shrink-0">
+                            {student.avatar_url ? (
+                              <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="font-bold text-gray-500">{student.first_name[0]}</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-800">{student.first_name} {student.last_name}</div>
+                            <div className="text-xs text-gray-500">{student.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-semibold text-nam-blue">{student.course_1 || 'Nessun corso'}</div>
+                        <div className="text-xs text-gray-500 bg-gray-100 inline-block px-1 rounded">
+                          {student.course_type || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="p-4 hidden md:table-cell">
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                          student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' : 
+                          student.enrollment_status === 'Prenotato' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {student.enrollment_status || 'Da definire'}
+                        </span>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {student.city ? <><i className="fas fa-map-marker-alt mr-1"></i>{student.city}</> : '-'}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        {/* Placeholder azioni notifiche future */}
+                        <div className="flex justify-center space-x-2">
+                          <button className="text-gray-300 hover:text-nam-blue" title="Invia Notifica Push (Presto disponibile)">
+                            <i className="fas fa-bell"></i>
+                          </button>
+                          <button className="text-gray-300 hover:text-nam-blue" title="Invia Email (Presto disponibile)">
+                            <i className="fas fa-envelope"></i>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <button 
+                          onClick={() => handleEdit(student)}
+                          className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-semibold"
+                        >
+                          Modifica
+                        </button>
+                        <button 
+                          onClick={() => student.id && handleDelete(student.id)}
+                          className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                        >
+                          Elimina
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-10 text-center text-gray-500">
+                      Nessun allievo trovato con questi filtri.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
   }
 
+  // --- VISTA FORM (Uguale a prima ma con Back Button migliorato) ---
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button onClick={() => setViewMode('list')} className="text-gray-500 hover:text-gray-800">
-            <i className="fas fa-arrow-left text-xl"></i>
+          <button 
+            onClick={() => setViewMode('list')} 
+            className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-gray-500 hover:text-nam-red hover:bg-gray-50 transition-all"
+          >
+            <i className="fas fa-arrow-left"></i>
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">Nuova Iscrizione</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {formData.id ? 'Modifica Studente' : 'Nuova Iscrizione'}
+            </h1>
+            <p className="text-xs text-gray-500">
+              {formData.id ? `ID: ${formData.id}` : 'Compila la scheda per iscrivere un nuovo allievo'}
+            </p>
+          </div>
         </div>
         <button 
           onClick={handleSubmit} 
           disabled={loading}
-          className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold"
+          className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold flex items-center"
         >
+          {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
           {loading ? 'Salvataggio...' : 'SALVA ALLIEVO'}
         </button>
       </div>
@@ -393,10 +609,10 @@ const StudentsView: React.FC = () => {
           <button
             key={idx}
             onClick={() => setActiveTab(idx)}
-            className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-colors ${
+            className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${
               activeTab === idx 
-                ? 'border-b-2 border-nam-red text-nam-red font-bold' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-nam-red text-nam-red font-bold bg-red-50' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
             {idx + 1}. {tab}
