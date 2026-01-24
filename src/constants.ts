@@ -1,5 +1,7 @@
 import { Lead, Course, Event, Payment, InventoryItem } from './types';
 
+// --- LISTE ESISTENTI (NON TOCCATE) ---
+
 export const TEACHERS_LIST = [
   "Fasoli Daniele", "Fedele Laura", "Ferrara Fabrizio", "Ferri Max", "Fincato Camilla",
   "Flaminio Claudio", "Folli Paola", "Furian Maxx", "Meneghello Luca", "Merlo Simone",
@@ -65,7 +67,6 @@ export const COURSES: Course[] = [
   { id: 5, name: 'Canto Pro 1', type: 'Individuale', teacher: 'M. Pavarotti', day: 'Venerdì' },
 ];
 
-// Updated mock events to match new Course names for filter demonstration
 export const EVENTS: Event[] = [
   { id: 1, title: 'Batteria Maxxima Anno 1 - Furian Maxx', room: 'Strumento piano terra', type: 'lesson', time: '10:00 - 11:00' },
   { id: 2, title: 'Canto Pro Anno 1 - Folli Paola', room: 'Canto piano terra', type: 'lesson', time: '11:00 - 12:00', isHybrid: true },
@@ -87,3 +88,52 @@ export const INVENTORY: InventoryItem[] = [
   { id: 3, name: 'Metodo Batteria Rock', category: 'Libri', stock: 8, royalties: 40.00 },
   { id: 4, name: 'Quaderno Pentagrammato', category: 'Cancelleria', stock: 100, royalties: 0 },
 ];
+
+
+// --- NUOVE LISTE PER SCHEDA ISCRIZIONE STUDENTE ---
+
+export const LISTS = {
+  GENDER: ['Maschio', 'Femmina'],
+
+  // Per il menù "Corso di interesse"
+  INTEREST_AREAS: [
+    "Albero del Canto", 
+    "Basso", 
+    "Canto", 
+    "Chitarra", 
+    "Coro", 
+    "Corsi Producer", 
+    "FUSSI", 
+    "Mix e Mastering", 
+    "Musica per Immagini", 
+    "Pianoforte", 
+    "Post Produzione Audio", 
+    "Producer", 
+    "Sound Design", 
+    "Batteria", 
+    "Batteria Maxxima", 
+    "Corso Giovanissimi", 
+    "DJ", 
+    "Fonico", 
+    "Music Business", 
+    "Sax"
+  ],
+
+  COURSE_TYPES: ['Carnet', 'Corso Base', 'Corso Pro', 'Masterclass'],
+
+  LOCATIONS: ['Centrale', 'Bovisa'],
+
+  OPEN_DAY: ['Prenotato', 'Non Prenotato'],
+
+  ENROLLMENT_STATUS: [
+    'Iscritto', 
+    'Colloquio', 
+    'Iscrizione', 
+    'Prenotato', 
+    'Non interessato/a'
+  ],
+
+  // Marketing & Lead Sources (usate per "Come ci hai conosciuto" e "Da dove arriva il contatto")
+  LEAD_SOURCES: ['Sito Web', 'Passaparola', 'Social Media', 'Evento', 'Altro'],
+  MARKETING_SOURCES: ['Google', 'Facebook/Instagram', 'Amici', 'Volantino', 'Altro']
+};
