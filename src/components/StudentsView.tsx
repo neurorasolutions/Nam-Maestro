@@ -68,7 +68,7 @@ const StudentsView: React.FC = () => {
     return matchesSearch && matchesCourse && matchesType;
   });
 
-  // --- LOGICA FORM (CREATE & UPDATE) ---
+  // --- LOGICA FORM ---
   
   const handleEdit = (student: Student) => {
     setFormData(student);
@@ -120,32 +120,68 @@ const StudentsView: React.FC = () => {
     }
   };
 
+  // --- IL CUORE DEL SISTEMA: SALVATAGGIO & INVITO ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
     try {
+      // 1. MODIFICA (Se l'ID esiste già, aggiorniamo solo i dati senza rimandare l'invito)
       if (formData.id) {
-        // UPDATE
         const { error } = await supabase
           .from('students')
           .update(formData)
           .eq('id', formData.id);
         if (error) throw error;
-        setMessage({ type: 'success', text: 'Studente aggiornato correttamente!' });
-      } else {
-        // CREATE (INSERT)
-        const { error } = await supabase.from('students').insert([formData]);
-        if (error) throw error;
-        setMessage({ type: 'success', text: 'Studente iscritto con successo!' });
-        setFormData(initialFormState); // Reset solo se è un nuovo inserimento
+        setMessage({ type: 'success', text: 'Dati studente aggiornati correttamente.' });
+      } 
+      // 2. NUOVO INSERIMENTO (Creazione DB + Email Invito)
+      else {
+        // A. Creiamo prima la scheda nel database
+        const { data: newStudent, error: insertError } = await supabase
+          .from('students')
+          .insert([formData])
+          .select()
+          .single();
+          
+        if (insertError) throw insertError;
+        
+        // B. Se c'è la mail, chiamiamo la API per invitare l'utente
+        if (formData.email) {
+            setMessage({ type: 'success', text: 'Scheda creata. Invio email di benvenuto in corso...' });
+            
+            const response = await fetch('/api/invite-student', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: formData.email,
+                studentId: newStudent.id,
+                firstName: formData.first_name
+              })
+            });
+            
+            if (!response.ok) {
+              const errData = await response.json();
+              console.error('Errore email:', errData);
+              // Non blocchiamo il successo, ma avvisiamo dell'errore mail
+              setMessage({ type: 'error', text: 'Studente salvato, ma errore invio email: ' + (errData.error || 'Errore server') });
+            } else {
+              setMessage({ type: 'success', text: 'Studente iscritto e Email di Invito inviata!' });
+              // Reset del form solo se tutto è andato bene
+              setFormData(initialFormState);
+            }
+        } else {
+            setMessage({ type: 'success', text: 'Studente salvato (Nessuna email inserita, invito non inviato).' });
+            setFormData(initialFormState);
+        }
       }
 
-      // Torna alla lista dopo breve delay opzionale, oppure rimani
+      // Torna alla lista dopo 2 secondi
       setTimeout(() => {
         setViewMode('list');
-      }, 1000);
+        setMessage(null);
+      }, 2500);
       
     } catch (error: any) {
       setMessage({ type: 'error', text: 'Errore salvataggio: ' + error.message });
@@ -154,7 +190,7 @@ const StudentsView: React.FC = () => {
     }
   };
 
-  // --- RENDERING DELLE TAB (Uguale a prima) ---
+  // --- RENDER TABS (Uguale a prima) ---
 
   const renderTab1_Anagrafica = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -248,8 +284,6 @@ const StudentsView: React.FC = () => {
             <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2 border rounded" />
           </div>
         </div>
-        
-        {/* TODO: Aggiungere PEC quando richiesto */}
         
         <h3 className="font-bold text-nam-blue border-b pb-1 mt-6">Credenziali Sistema</h3>
         <div className="flex items-center space-x-4">
@@ -526,7 +560,6 @@ const StudentsView: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4 text-center">
-                        {/* Placeholder azioni notifiche future */}
                         <div className="flex justify-center space-x-2">
                           <button className="text-gray-300 hover:text-nam-blue" title="Invia Notifica Push (Presto disponibile)">
                             <i className="fas fa-bell"></i>
@@ -567,7 +600,7 @@ const StudentsView: React.FC = () => {
     );
   }
 
-  // --- VISTA FORM (Uguale a prima ma con Back Button migliorato) ---
+  // --- VISTA FORM ---
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -593,7 +626,7 @@ const StudentsView: React.FC = () => {
           className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold flex items-center"
         >
           {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
-          {loading ? 'Salvataggio...' : 'SALVA ALLIEVO'}
+          {loading ? 'Attendere...' : 'SALVA & INVITA'}
         </button>
       </div>
 
