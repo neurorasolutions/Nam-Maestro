@@ -27,22 +27,47 @@ export const ROOMS_LIST = [
   "Strumento Secondo Piano"
 ];
 
+// --- CORSI PRINCIPALI (per iscrizione studenti) ---
+export const MAIN_COURSES = [
+  "Fonico Anno Unico",
+  // Altri corsi principali da aggiungere...
+];
+
+// --- MATERIE PER CORSO PRINCIPALE (con ore totali) ---
+export const COURSE_SUBJECTS: Record<string, { name: string; hours: number; type: 'collettivo' | 'individuale' }[]> = {
+  "Fonico Anno Unico": [
+    { name: "Teoria e Tecnica AU", hours: 34, type: 'collettivo' },
+    { name: "Pro Tools AU", hours: 26, type: 'collettivo' },
+    { name: "Informatica AU", hours: 24, type: 'collettivo' },
+    { name: "Teoria Musicale per Fonici AU", hours: 28, type: 'collettivo' },
+    { name: "Pratica Studio AU", hours: 78, type: 'collettivo' },
+    { name: "Fisica della Fonotecnica AU", hours: 30, type: 'collettivo' },
+    { name: "Rec AU", hours: 15, type: 'collettivo' },
+    { name: "Mixaggio AU", hours: 16, type: 'collettivo' },
+    { name: "Music Business", hours: 8, type: 'collettivo' },
+    { name: "Seminario Mastering", hours: 6, type: 'collettivo' },
+    { name: "Seminario Sound Design", hours: 4, type: 'collettivo' },
+    { name: "Riunione Preliminare Anno Unico Fonico", hours: 0, type: 'collettivo' },
+  ],
+};
+
+// --- LISTA CORSI LEGACY (per compatibilità dropdown esistenti) ---
 export const COURSES_LIST = [
-  "Basso Avanzato Anno 1", "Basso Base Anno 1", "Basso Intermedio Anno 1", "Basso Pro Anno 1", 
+  "Basso Avanzato Anno 1", "Basso Base Anno 1", "Basso Intermedio Anno 1", "Basso Pro Anno 1",
   "Basso Pro Anno 2", "Basso Pro Anno 3",
-  "Batteria Avanzato Anno 1", "Batteria Base Anno 1", "Batteria Intermedio Anno 1", 
-  "Batteria Maxxima Anno 1", "Batteria Maxxima Anno 2", "Batteria Maxxima Anno 3", 
-  "Batteria Maxxima Quarto Anno Anno 1", "Batteria Mini Pro Anno 1", "Batteria Mini Pro Anno 2", 
+  "Batteria Avanzato Anno 1", "Batteria Base Anno 1", "Batteria Intermedio Anno 1",
+  "Batteria Maxxima Anno 1", "Batteria Maxxima Anno 2", "Batteria Maxxima Anno 3",
+  "Batteria Maxxima Quarto Anno Anno 1", "Batteria Mini Pro Anno 1", "Batteria Mini Pro Anno 2",
   "Batteria Mini Pro Anno 3", "Batteria Pro Anno 1", "Batteria Pro Anno 2",
-  "Canto Avanzato Anno 1", "Canto Base Anno 1", "Canto Intermedio Anno 1", "Canto Pro Anno 1", 
+  "Canto Avanzato Anno 1", "Canto Base Anno 1", "Canto Intermedio Anno 1", "Canto Pro Anno 1",
   "Canto Pro Anno 2", "Canto Pro Anno 3",
-  "Chitarra Avanzato Anno 1", "Chitarra Base Anno 1", "Chitarra Intermedio Anno 1", 
+  "Chitarra Avanzato Anno 1", "Chitarra Base Anno 1", "Chitarra Intermedio Anno 1",
   "Chitarra Pro Anno 1", "Chitarra Pro Anno 2", "Chitarra Pro Anno 3",
   "DJ Pro Anno 1", "EMP PRO Anno 1",
   "Fonico Anno Unico Anno 1", "Fonico Anno Unico Full Anno 1", "Fonico Biennio Anno 1", "Fonico Biennio Anno 2",
-  "GIOVANISSIMI basso Anno 1", "GIOVANISSIMI batteria Anno 1", "GIOVANISSIMI canto Anno 1", 
+  "GIOVANISSIMI basso Anno 1", "GIOVANISSIMI batteria Anno 1", "GIOVANISSIMI canto Anno 1",
   "GIOVANISSIMI chitarra Anno 1", "GIOVANISSIMI pianoforte Anno 1",
-  "Pianoforte Avanzato Anno 1", "Pianoforte Base Anno 1", "Pianoforte Intermedio Anno 1", 
+  "Pianoforte Avanzato Anno 1", "Pianoforte Base Anno 1", "Pianoforte Intermedio Anno 1",
   "Pianoforte Pro Anno 1", "Pianoforte Pro Anno 2",
   "Producer & Composer Anno Unico Anno 1", "Producer & Composer Biennio Anno 1", "Producer & Composer Biennio Anno 2",
   "Producer AU Full Anno 1",
@@ -97,25 +122,25 @@ export const LISTS = {
 
   // Per il menù "Corso di interesse"
   INTEREST_AREAS: [
-    "Albero del Canto", 
-    "Basso", 
-    "Canto", 
-    "Chitarra", 
-    "Coro", 
-    "Corsi Producer", 
-    "FUSSI", 
-    "Mix e Mastering", 
-    "Musica per Immagini", 
-    "Pianoforte", 
-    "Post Produzione Audio", 
-    "Producer", 
-    "Sound Design", 
-    "Batteria", 
-    "Batteria Maxxima", 
-    "Corso Giovanissimi", 
-    "DJ", 
-    "Fonico", 
-    "Music Business", 
+    "Albero del Canto",
+    "Basso",
+    "Canto",
+    "Chitarra",
+    "Coro",
+    "Corsi Producer",
+    "FUSSI",
+    "Mix e Mastering",
+    "Musica per Immagini",
+    "Pianoforte",
+    "Post Produzione Audio",
+    "Producer",
+    "Sound Design",
+    "Batteria",
+    "Batteria Maxxima",
+    "Corso Giovanissimi",
+    "DJ",
+    "Fonico",
+    "Music Business",
     "Sax"
   ],
 
@@ -126,10 +151,10 @@ export const LISTS = {
   OPEN_DAY: ['Prenotato', 'Non Prenotato'],
 
   ENROLLMENT_STATUS: [
-    'Iscritto', 
-    'Colloquio', 
-    'Iscrizione', 
-    'Prenotato', 
+    'Iscritto',
+    'Colloquio',
+    'Iscrizione',
+    'Prenotato',
     'Non interessato/a'
   ],
 

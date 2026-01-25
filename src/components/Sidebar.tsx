@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { View } from '../types';
+import { View, Role } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import UserProfileModal from './UserProfileModal';
 
 interface SidebarProps {
   activeView: View;
   onViewChange: (view: View) => void;
+  role: Role;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, role }) => {
   const { session } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -16,15 +17,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
   const userEmail = session?.user?.email || 'Utente';
   const userInitial = userEmail.charAt(0).toUpperCase();
 
-  const menuItems: { id: View; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard & Calendario', icon: 'fa-calendar-alt' },
-    { id: 'crm', label: 'CRM & Lead', icon: 'fa-bullhorn' },
-    { id: 'didactics', label: 'Didattica & Corsi', icon: 'fa-graduation-cap' },
-    { id: 'students', label: 'Segreteria & Iscritti', icon: 'fa-user-graduate' },
-    { id: 'admin', label: 'Amministrazione', icon: 'fa-euro-sign' },
-    { id: 'warehouse', label: 'Magazzino & Shop', icon: 'fa-boxes' },
-    { id: 'reports', label: 'Reportistica', icon: 'fa-chart-pie' },
+  // Definizione degli item del menu con i ruoli che possono vederli
+  const menuItems: { id: View; label: string; icon: string; roles: Role[] }[] = [
+    { id: 'dashboard', label: 'Dashboard & Calendario', icon: 'fa-calendar-alt', roles: ['direzione', 'segreteria'] },
+    { id: 'crm', label: 'CRM & Lead', icon: 'fa-bullhorn', roles: ['direzione'] },
+    { id: 'didactics', label: 'Didattica & Corsi', icon: 'fa-graduation-cap', roles: ['direzione', 'segreteria'] },
+    { id: 'students', label: 'Segreteria & Iscritti', icon: 'fa-user-graduate', roles: ['direzione', 'segreteria'] },
+    { id: 'admin', label: 'Amministrazione', icon: 'fa-euro-sign', roles: ['direzione'] },
+    { id: 'warehouse', label: 'Magazzino & Shop', icon: 'fa-boxes', roles: ['direzione'] },
+    { id: 'reports', label: 'Reportistica', icon: 'fa-chart-pie', roles: ['direzione'] },
   ];
+
+  // Filtra i menu in base al ruolo corrente
+  const filteredMenuItems = menuItems.filter(item => item.roles.includes(role));
 
   return (
     <>
@@ -33,9 +38,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
         <div className="h-[50px] bg-[#367fa9] flex items-center justify-center font-bold text-xl tracking-wider">
           NAM <span className="font-light text-sm ml-1">MAESTRO</span>
         </div>
-        
+
         {/* User Profile - Ora cliccabile */}
-        <div 
+        <div
           onClick={() => setIsModalOpen(true)}
           className="p-4 flex items-center border-b border-gray-700 mb-2 cursor-pointer hover:bg-[#2c3b41] transition-colors"
           title="Clicca per gestire il profilo"
@@ -56,15 +61,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
         <nav className="flex-1 overflow-y-auto mt-2">
           <p className="px-4 text-xs text-gray-400 uppercase mb-2 font-semibold">Navigazione</p>
           <ul>
-            {menuItems.map((item) => (
+            {filteredMenuItems.map((item) => (
               <li key={item.id} className="mb-0.5">
                 <button
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full text-left px-4 py-3 text-sm transition-colors border-l-4 flex items-center ${
-                    activeView === item.id
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors border-l-4 flex items-center ${activeView === item.id
                       ? 'bg-[#1e282c] border-nam-blue text-white'
                       : 'border-transparent text-[#b8c7ce] hover:bg-[#1e282c] hover:text-white'
-                  }`}
+                    }`}
                 >
                   <i className={`fas ${item.icon} w-6`}></i>
                   {item.label}
@@ -73,16 +77,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
             ))}
           </ul>
         </nav>
-        
+
         <div className="p-4 text-xs text-gray-500 text-center">
           v2.4.1 - NAM Legacy
         </div>
       </aside>
 
       {/* Modale Profilo */}
-      <UserProfileModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <UserProfileModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
       />
     </>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { EVENTS, TEACHERS_LIST, ROOMS_LIST, COURSES_LIST } from '../constants';
+import { EVENTS, TEACHERS_LIST, ROOMS_LIST, COURSES_LIST, MAIN_COURSES, COURSE_SUBJECTS } from '../constants';
 
 // Interface helper specifically for the view state
 interface CalendarEvent {
@@ -60,7 +60,7 @@ const CalendarView: React.FC = () => {
           room: lesson.room || 'TBD',
           type: 'lesson' as const,
           time: `${lesson.start_time?.slice(0, 5) || '10:00'} - ${lesson.end_time?.slice(0, 5) || '11:00'}`,
-          date: new Date(lesson.lesson_date),
+          date: new Date(lesson.lesson_date + 'T12:00:00'), // Add noon to avoid timezone shift
           isHybrid: lesson.is_hybrid || false,
           // Extra fields for Supabase sync
           supabaseId: lesson.id,
@@ -83,12 +83,27 @@ const CalendarView: React.FC = () => {
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
 
   // Form State
-  const [formCourse, setFormCourse] = useState('');
+  const [formMainCourse, setFormMainCourse] = useState('');      // Corso Principale
+  const [formSubject, setFormSubject] = useState('');            // Materia
+  const [formCourse, setFormCourse] = useState('');              // Legacy (kept for compatibility)
   const [formTeacher, setFormTeacher] = useState('');
   const [formRoom, setFormRoom] = useState('');
   const [formData, setFormData] = useState('');
   const [formStart, setFormStart] = useState('10:00');
   const [formEnd, setFormEnd] = useState('11:00');
+
+  // Search filters for dropdowns
+  const [mainCourseSearch, setMainCourseSearch] = useState('');
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+
+  // Dropdown open/close states
+  const [isMainCourseOpen, setIsMainCourseOpen] = useState(false);
+  const [isSubjectOpen, setIsSubjectOpen] = useState(false);
+  const [isTeacherOpen, setIsTeacherOpen] = useState(false);
+
+  // Computed: available subjects based on selected main course
+  const availableSubjects = formMainCourse ? (COURSE_SUBJECTS[formMainCourse] || []) : [];
 
   useEffect(() => {
     const year = currentDate.getFullYear();
@@ -495,7 +510,11 @@ const CalendarView: React.FC = () => {
   // ... (Rest of component methods like saveManual, delete, etc. assumed preserved) ...
   const handleSaveManualEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formCourse || !formTeacher || !formRoom) { alert("Compila tutti i campi obbligatori"); return; }
+    // Validate new required fields
+    if (!formMainCourse || !formSubject || !formTeacher || !formRoom) {
+      alert("Compila tutti i campi obbligatori (Corso, Materia, Docente, Aula)");
+      return;
+    }
 
     const [year, month, day] = formData.split('-').map(Number);
     const eventDate = new Date(year, month - 1, day);
@@ -503,8 +522,8 @@ const CalendarView: React.FC = () => {
 
     // Prepare payload for Supabase
     const supabasePayload = {
-      title: formCourse,
-      course_name: formCourse, // Important for RLS filtering by course
+      title: formSubject,                  // La materia (es. "Informatica AU")
+      course_name: formMainCourse,         // Il corso principale (es. "Fonico Anno Unico") - usato per filtrare nella PWA
       teacher_name: formTeacher,
       room: formRoom,
       lesson_date: lessonDateStr,
@@ -526,7 +545,7 @@ const CalendarView: React.FC = () => {
         // Update local state
         setEvents(prev => prev.map(ev => ev.id === editingEventId ? {
           ...ev,
-          title: `${formCourse} - ${formTeacher}`,
+          title: `${formSubject} - ${formTeacher}`,
           room: formRoom,
           time: `${formStart} - ${formEnd}`,
           date: eventDate
@@ -544,7 +563,7 @@ const CalendarView: React.FC = () => {
         // Add to local state with Supabase ID
         const newEvent: CalendarEvent = {
           id: data.id,
-          title: `${formCourse} - ${formTeacher}`,
+          title: `${formSubject} - ${formTeacher}`,
           room: formRoom,
           type: 'lesson',
           time: `${formStart} - ${formEnd}`,
@@ -557,7 +576,14 @@ const CalendarView: React.FC = () => {
 
       setShowManualModal(false);
       setEditingEventId(null);
+      // Reset form fields
+      setFormMainCourse('');
+      setFormSubject('');
       setFormCourse('');
+      setFormTeacher('');
+      setMainCourseSearch('');
+      setSubjectSearch('');
+      setTeacherSearch('');
     } catch (err: any) {
       console.error('Errore salvataggio:', err);
       alert('Errore salvataggio: ' + err.message);
@@ -726,9 +752,9 @@ const CalendarView: React.FC = () => {
           <div className="flex items-center space-x-4 mb-2">
             <h2 className="text-2xl font-bold text-gray-700 capitalize w-[450px] truncate">{getPeriodLabel()}</h2>
             <div className="flex items-center bg-white border border-gray-300 rounded shadow-sm">
-              <button onClick={handlePrev} className="px-3 py-1 hover:bg-gray-100 border-r border-gray-300 text-gray-600"><i className="fas fa-chevron-left"></i></button>
-              <button onClick={handleToday} className="px-4 py-1 hover:bg-gray-100 font-semibold text-sm text-gray-700 capitalize min-w-[90px]">{viewType === 'month' ? 'Mese' : viewType === 'week' ? 'Settimana' : 'Giorno'}</button>
-              <button onClick={handleNext} className="px-3 py-1 hover:bg-gray-100 border-l border-gray-300 text-gray-600"><i className="fas fa-chevron-right"></i></button>
+              <button onClick={handlePrev} className="px-3 py-1.5 hover:bg-gray-100 border-r border-gray-300 text-gray-600 font-bold text-lg active:scale-75 active:bg-gray-200 transition-all duration-150">◀</button>
+              <button onClick={handleToday} className="px-4 py-1.5 hover:bg-gray-100 font-semibold text-sm text-gray-700 capitalize min-w-[90px] active:bg-blue-100 transition-colors">{viewType === 'month' ? 'Mese' : viewType === 'week' ? 'Settimana' : 'Giorno'}</button>
+              <button onClick={handleNext} className="px-3 py-1.5 hover:bg-gray-100 border-l border-gray-300 text-gray-600 font-bold text-lg active:scale-75 active:bg-gray-200 transition-all duration-150">▶</button>
             </div>
           </div>
           <div className="flex space-x-3">
@@ -793,36 +819,151 @@ const CalendarView: React.FC = () => {
             )}
             <div className="p-6">
               <form className="space-y-4" onSubmit={handleSaveManualEvent}>
+                {/* ROW 1: Corso Principale + Materia */}
                 <div className="grid grid-cols-2 gap-4">
+                  {/* CORSO PRINCIPALE */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Corso</label>
-                    <select value={formCourse} onChange={(e) => setFormCourse(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none">
-                      <option value="">Seleziona Corso...</option>
-                      {["Informatica Musicale", "fisica della fonotecnica", "Teoria Tecnica", "Pratica Studio", "Teoria e Solfeggio"].map((c, i) => <option key={i} value={c}>{c}</option>)}
-                    </select>
+                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Corso Principale *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 Cerca corso..."
+                        value={formMainCourse || mainCourseSearch}
+                        onChange={(e) => {
+                          setMainCourseSearch(e.target.value);
+                          setFormMainCourse('');
+                          setIsMainCourseOpen(true);
+                        }}
+                        onFocus={() => setIsMainCourseOpen(true)}
+                        onBlur={() => setTimeout(() => setIsMainCourseOpen(false), 150)}
+                        className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none"
+                      />
+                      {isMainCourseOpen && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
+                          {MAIN_COURSES
+                            .filter(c => c.toLowerCase().includes((mainCourseSearch || '').toLowerCase()))
+                            .map((c, i) => (
+                              <div
+                                key={i}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setFormMainCourse(c);
+                                  setMainCourseSearch('');
+                                  setFormSubject('');
+                                  setSubjectSearch('');
+                                  setIsMainCourseOpen(false);
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${formMainCourse === c ? 'bg-blue-100 font-bold' : ''}`}
+                              >
+                                {c}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* MATERIA */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Docente</label>
-                    <select value={formTeacher} onChange={(e) => setFormTeacher(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none">
-                      <option value="">Seleziona Docente...</option>
-                      {TEACHERS_LIST.map((t, i) => <option key={i} value={t}>{t}</option>)}
-                    </select>
+                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Materia *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={formMainCourse ? "🔍 Cerca materia..." : "Seleziona prima il corso"}
+                        value={formSubject || subjectSearch}
+                        onChange={(e) => {
+                          setSubjectSearch(e.target.value);
+                          setFormSubject('');
+                          setIsSubjectOpen(true);
+                        }}
+                        onFocus={() => formMainCourse && setIsSubjectOpen(true)}
+                        onBlur={() => setTimeout(() => setIsSubjectOpen(false), 150)}
+                        disabled={!formMainCourse}
+                        className={`w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none ${!formMainCourse ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                      {isSubjectOpen && formMainCourse && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
+                          {availableSubjects
+                            .filter(s => s.name.toLowerCase().includes((subjectSearch || '').toLowerCase()))
+                            .map((s, i) => (
+                              <div
+                                key={i}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setFormSubject(s.name);
+                                  setSubjectSearch('');
+                                  setIsSubjectOpen(false);
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex justify-between ${formSubject === s.name ? 'bg-blue-100 font-bold' : ''}`}
+                              >
+                                <span>{s.name}</span>
+                                <span className="text-gray-400 text-xs">{s.hours}h • {s.type}</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* ROW 2: Docente + Aula */}
                 <div className="grid grid-cols-2 gap-4">
+                  {/* DOCENTE con ricerca */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Aula</label>
+                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Docente *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 Cerca docente..."
+                        value={formTeacher || teacherSearch}
+                        onChange={(e) => {
+                          setTeacherSearch(e.target.value);
+                          setFormTeacher('');
+                          setIsTeacherOpen(true);
+                        }}
+                        onFocus={() => setIsTeacherOpen(true)}
+                        onBlur={() => setTimeout(() => setIsTeacherOpen(false), 150)}
+                        className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none"
+                      />
+                      {isTeacherOpen && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
+                          {TEACHERS_LIST
+                            .filter(t => t.toLowerCase().includes((teacherSearch || '').toLowerCase()))
+                            .map((t, i) => (
+                              <div
+                                key={i}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setFormTeacher(t);
+                                  setTeacherSearch('');
+                                  setIsTeacherOpen(false);
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${formTeacher === t ? 'bg-blue-100 font-bold' : ''}`}
+                              >
+                                {t}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AULA */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Aula *</label>
                     <select value={formRoom} onChange={(e) => setFormRoom(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none">
                       <option value="">Seleziona Aula...</option>
                       {ROOMS_LIST.map((r, i) => <option key={i} value={r}>{r}</option>)}
                     </select>
                   </div>
+                </div>
+
+                {/* ROW 3: Data + Orari */}
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Data</label>
                     <input type="date" value={formData} onChange={(e) => setFormData(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none" />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Orario Inizio</label>
                     <input type="time" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none" />
@@ -832,6 +973,7 @@ const CalendarView: React.FC = () => {
                     <input type="time" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none" />
                   </div>
                 </div>
+
                 <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
                   {editingEventId && (
                     <button type="button" onClick={handleDeleteEvent} className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded shadow hover:bg-red-700 flex items-center">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Role } from '../src/types';
+import { Role } from '../types';
 
 interface HeaderProps {
   role: Role;
@@ -11,7 +11,7 @@ const Header: React.FC<HeaderProps> = ({ role, onRoleChange, onToggleSidebar }) 
   return (
     <header className="h-[50px] bg-white shadow-sm flex items-center justify-between px-4 z-10">
       <div className="flex items-center text-gray-500">
-        <button 
+        <button
           onClick={onToggleSidebar}
           className="mr-4 hover:bg-gray-100 p-2 rounded focus:outline-none transition-colors"
         >
@@ -26,33 +26,21 @@ const Header: React.FC<HeaderProps> = ({ role, onRoleChange, onToggleSidebar }) 
           <span className="text-xs font-semibold text-gray-600 px-3 uppercase tracking-wide">Vista:</span>
           <button
             onClick={() => onRoleChange('direzione')}
-            className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${
-              role === 'direzione'
-                ? 'bg-nam-red text-white shadow'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${role === 'direzione'
+              ? 'bg-nam-red text-white shadow'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             DIREZIONE
           </button>
           <button
             onClick={() => onRoleChange('segreteria')}
-            className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${
-              role === 'segreteria'
-                ? 'bg-nam-blue text-white shadow'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${role === 'segreteria'
+              ? 'bg-nam-blue text-white shadow'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             SEGRETERIA
-          </button>
-          <button
-            onClick={() => onRoleChange('studenti')}
-            className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${
-              role === 'studenti'
-                ? 'bg-nam-yellow text-white shadow'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            STUDENTI
           </button>
         </div>
 

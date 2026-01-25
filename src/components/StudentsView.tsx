@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { LISTS } from '../constants';
+import { LISTS, COURSES_LIST } from '../constants';
 import { Student } from '../types';
 
 const StudentsView: React.FC = () => {
@@ -20,7 +20,7 @@ const StudentsView: React.FC = () => {
 
   // Stato iniziale vuoto per il form
   const initialFormState: Partial<Student> = {
-    first_name: '', last_name: '', email: '', 
+    first_name: '', last_name: '', email: '',
     country: 'Italia', billing_country: 'Italia',
     is_web_access_enabled: false, is_moodle_access_enabled: false,
     privacy_consent: false, billing_different: false
@@ -36,7 +36,7 @@ const StudentsView: React.FC = () => {
         .from('students')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setStudents(data || []);
     } catch (error: any) {
@@ -56,12 +56,12 @@ const StudentsView: React.FC = () => {
   // --- LOGICA FILTRI ---
   const filteredStudents = students.filter(student => {
     const searchLower = filters.search.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       (student.first_name?.toLowerCase().includes(searchLower) || '') ||
       (student.last_name?.toLowerCase().includes(searchLower) || '') ||
       (student.email?.toLowerCase().includes(searchLower) || '') ||
       (student.city?.toLowerCase().includes(searchLower) || '');
-    
+
     const matchesCourse = filters.course ? (student.course_1 === filters.course || student.course_2 === filters.course) : true;
     const matchesType = filters.type ? student.course_type === filters.type : true;
 
@@ -69,7 +69,7 @@ const StudentsView: React.FC = () => {
   });
 
   // --- LOGICA FORM ---
-  
+
   const handleEdit = (student: Student) => {
     setFormData(student);
     setViewMode('form');
@@ -79,7 +79,7 @@ const StudentsView: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Sei sicuro di voler eliminare questo studente? L'azione è irreversibile.")) return;
-    
+
     try {
       const { error } = await supabase.from('students').delete().eq('id', id);
       if (error) throw error;
@@ -92,7 +92,7 @@ const StudentsView: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -135,7 +135,7 @@ const StudentsView: React.FC = () => {
           .eq('id', formData.id);
         if (error) throw error;
         setMessage({ type: 'success', text: 'Dati studente aggiornati correttamente.' });
-      } 
+      }
       // 2. NUOVO INSERIMENTO (Creazione DB + Email Invito)
       else {
         // A. Creiamo prima la scheda nel database
@@ -144,36 +144,36 @@ const StudentsView: React.FC = () => {
           .insert([formData])
           .select()
           .single();
-          
+
         if (insertError) throw insertError;
-        
+
         // B. Se c'è la mail, chiamiamo la API per invitare l'utente
         if (formData.email) {
-            setMessage({ type: 'success', text: 'Scheda creata. Invio email di benvenuto in corso...' });
-            
-            const response = await fetch('/api/invite-student', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: formData.email,
-                studentId: newStudent.id,
-                firstName: formData.first_name
-              })
-            });
-            
-            if (!response.ok) {
-              const errData = await response.json();
-              console.error('Errore email:', errData);
-              // Non blocchiamo il successo, ma avvisiamo dell'errore mail
-              setMessage({ type: 'error', text: 'Studente salvato, ma errore invio email: ' + (errData.error || 'Errore server') });
-            } else {
-              setMessage({ type: 'success', text: 'Studente iscritto e Email di Invito inviata!' });
-              // Reset del form solo se tutto è andato bene
-              setFormData(initialFormState);
-            }
-        } else {
-            setMessage({ type: 'success', text: 'Studente salvato (Nessuna email inserita, invito non inviato).' });
+          setMessage({ type: 'success', text: 'Scheda creata. Invio email di benvenuto in corso...' });
+
+          const response = await fetch('/api/invite-student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: formData.email,
+              studentId: newStudent.id,
+              firstName: formData.first_name
+            })
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            console.error('Errore email:', errData);
+            // Non blocchiamo il successo, ma avvisiamo dell'errore mail
+            setMessage({ type: 'error', text: 'Studente salvato, ma errore invio email: ' + (errData.error || 'Errore server') });
+          } else {
+            setMessage({ type: 'success', text: 'Studente iscritto e Email di Invito inviata!' });
+            // Reset del form solo se tutto è andato bene
             setFormData(initialFormState);
+          }
+        } else {
+          setMessage({ type: 'success', text: 'Studente salvato (Nessuna email inserita, invito non inviato).' });
+          setFormData(initialFormState);
         }
       }
 
@@ -182,7 +182,7 @@ const StudentsView: React.FC = () => {
         setViewMode('list');
         setMessage(null);
       }, 2500);
-      
+
     } catch (error: any) {
       setMessage({ type: 'error', text: 'Errore salvataggio: ' + error.message });
     } finally {
@@ -196,14 +196,14 @@ const StudentsView: React.FC = () => {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-4">
         <div className="flex items-center space-x-4">
-          <div 
+          <div
             onClick={() => fileInputRef.current?.click()}
             className="w-24 h-24 bg-gray-200 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center cursor-pointer hover:bg-gray-100 overflow-hidden relative"
           >
             {formData.avatar_url ? (
               <img src={formData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-gray-500 text-xs text-center p-2">Carica<br/>Foto</span>
+              <span className="text-gray-500 text-xs text-center p-2">Carica<br />Foto</span>
             )}
           </div>
           <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/*" />
@@ -216,17 +216,17 @@ const StudentsView: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Nome *</label>
-            <input name="first_name" required value={formData.first_name} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="first_name" required value={formData.first_name} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Cognome *</label>
-            <input name="last_name" required value={formData.last_name} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="last_name" required value={formData.last_name} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Genere</label>
-          <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border rounded">
+          <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
             <option value="">Seleziona...</option>
             {LISTS.GENDER.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
@@ -236,30 +236,30 @@ const StudentsView: React.FC = () => {
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Data di Nascita</label>
-          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className="w-full p-2 border rounded" />
+          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Luogo Nascita</label>
-            <input name="birth_place" value={formData.birth_place} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="birth_place" value={formData.birth_place} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Provincia</label>
-            <input name="birth_province" value={formData.birth_province} onChange={handleChange} className="w-full p-2 border rounded" maxLength={2} />
+            <input name="birth_province" value={formData.birth_province} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" maxLength={2} />
           </div>
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Paese Nascita</label>
-          <input name="birth_country" value={formData.birth_country} onChange={handleChange} className="w-full p-2 border rounded" />
+          <input name="birth_country" value={formData.birth_country} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Codice Fiscale</label>
-            <input name="fiscal_code" value={formData.fiscal_code} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="fiscal_code" value={formData.fiscal_code} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Cittadinanza</label>
-            <input name="citizenship" value={formData.citizenship} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="citizenship" value={formData.citizenship} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
         </div>
       </div>
@@ -277,14 +277,14 @@ const StudentsView: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Cellulare</label>
-            <input name="mobile_phone" value={formData.mobile_phone} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="mobile_phone" value={formData.mobile_phone} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Telefono</label>
-            <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
         </div>
-        
+
         <h3 className="font-bold text-nam-blue border-b pb-1 mt-6">Credenziali Sistema</h3>
         <div className="flex items-center space-x-4">
           <label className="flex items-center space-x-2">
@@ -302,26 +302,26 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Residenza</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Indirizzo</label>
-          <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2 border rounded" />
+          <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-700 uppercase">CAP</label>
-            <input name="zip_code" value={formData.zip_code} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="zip_code" value={formData.zip_code} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div className="col-span-2">
             <label className="block text-xs font-bold text-gray-700 uppercase">Città</label>
-            <input name="city" value={formData.city} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="city" value={formData.city} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Provincia</label>
-            <input name="province" value={formData.province} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="province" value={formData.province} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Paese</label>
-            <input name="country" value={formData.country} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="country" value={formData.country} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
           </div>
         </div>
       </div>
@@ -334,23 +334,43 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Interessi & Corsi</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Primo Corso di Interesse</label>
-          <select name="course_1" value={formData.course_1} onChange={handleChange} className="w-full p-2 border rounded">
+          <select name="course_1" value={formData.course_1} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
             <option value="">Seleziona...</option>
             {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Secondo Corso di Interesse</label>
-          <select name="course_2" value={formData.course_2} onChange={handleChange} className="w-full p-2 border rounded">
+          <select name="course_2" value={formData.course_2} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
             <option value="">Seleziona...</option>
             {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Tipologia Corso</label>
-          <select name="course_type" value={formData.course_type} onChange={handleChange} className="w-full p-2 border rounded">
+          <select name="course_type" value={formData.course_type} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
             <option value="">Seleziona...</option>
             {LISTS.COURSE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        {/* CORSO DI ISCRIZIONE EFFETTIVO - scrive in enrolled_course */}
+        <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(11, 19, 43, 0.05)', border: '2px solid #0B132B' }}>
+          <label className="block text-xs font-bold uppercase mb-1" style={{ color: '#0B132B' }}>
+            📌 Corso di Iscrizione (Effettivo)
+          </label>
+          <p className="text-xs mb-2" style={{ color: '#0B132B' }}>
+            Seleziona il corso specifico a cui lo studente si iscrive. Questo campo collega lo studente alle lezioni.
+          </p>
+          <select
+            name="enrolled_course"
+            value={formData.enrolled_course || ''}
+            onChange={handleChange}
+            className="w-full p-2 rounded font-bold bg-white"
+            style={{ border: '2px solid #0B132B', color: '#0B132B' }}
+          >
+            <option value="">-- Seleziona Corso Effettivo --</option>
+            {COURSES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
@@ -360,14 +380,14 @@ const StudentsView: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Come ci hai conosciuto</label>
-            <select name="marketing_source" value={formData.marketing_source} onChange={handleChange} className="w-full p-2 border rounded">
+            <select name="marketing_source" value={formData.marketing_source} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
               <option value="">Seleziona...</option>
               {LISTS.MARKETING_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Fonte Lead</label>
-            <select name="lead_source" value={formData.lead_source} onChange={handleChange} className="w-full p-2 border rounded">
+            <select name="lead_source" value={formData.lead_source} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
               <option value="">Seleziona...</option>
               {LISTS.LEAD_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -384,16 +404,16 @@ const StudentsView: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Open Day</label>
-            <select name="open_day_status" value={formData.open_day_status} onChange={handleChange} className="w-full p-2 border rounded">
+            <select name="open_day_status" value={formData.open_day_status} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
               <option value="">Seleziona...</option>
               {LISTS.OPEN_DAY.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
-        
+
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Sede di Riferimento</label>
-          <select name="location" value={formData.location} onChange={handleChange} className="w-full p-2 border rounded">
+          <select name="location" value={formData.location} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
             <option value="">Seleziona...</option>
             {LISTS.LOCATIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -408,9 +428,9 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Dati Fiscali</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Partita IVA</label>
-          <input name="vat_number" value={formData.vat_number} onChange={handleChange} className="w-full p-2 border rounded" />
+          <input name="vat_number" value={formData.vat_number} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
         </div>
-        
+
         <label className="flex items-center space-x-2 bg-gray-100 p-2 rounded">
           <input type="checkbox" name="billing_different" checked={formData.billing_different} onChange={handleChange} />
           <span className="text-sm font-semibold">Indirizzo fatturazione diverso?</span>
@@ -431,9 +451,9 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Note & Privacy</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Note Interne</label>
-          <textarea name="notes" value={formData.notes} onChange={handleChange} rows={4} className="w-full p-2 border rounded" />
+          <textarea name="notes" value={formData.notes} onChange={handleChange} rows={4} className="w-full p-2 border border-gray-400 rounded" />
         </div>
-        
+
         <div className="bg-yellow-50 p-4 border border-yellow-200 rounded">
           <label className="flex items-center space-x-3">
             <input type="checkbox" name="privacy_consent" checked={formData.privacy_consent} onChange={handleChange} className="h-5 w-5 text-nam-green" />
@@ -459,7 +479,7 @@ const StudentsView: React.FC = () => {
               {filteredStudents.length} Iscritti
             </span>
           </h1>
-          <button 
+          <button
             onClick={() => {
               setFormData(initialFormState);
               setViewMode('form');
@@ -469,28 +489,28 @@ const StudentsView: React.FC = () => {
             <i className="fas fa-plus mr-2"></i> Nuovo Iscritto
           </button>
         </div>
-        
+
         {/* Filtri */}
         <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cerca (Nome, Città, Email)</label>
             <div className="relative">
               <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-              <input 
-                type="text" 
-                placeholder="Cerca..." 
+              <input
+                type="text"
+                placeholder="Cerca..."
                 value={filters.search}
-                onChange={(e) => setFilters(prev => ({...prev, search: e.target.value}))}
+                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                 className="w-full pl-10 p-2 border rounded focus:ring-nam-red focus:border-nam-red"
               />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtra per Corso</label>
-            <select 
+            <select
               value={filters.course}
-              onChange={(e) => setFilters(prev => ({...prev, course: e.target.value}))}
-              className="w-full p-2 border rounded"
+              onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
+              className="w-full p-2 border border-gray-400 rounded"
             >
               <option value="">Tutti i Corsi</option>
               {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -498,10 +518,10 @@ const StudentsView: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipologia</label>
-            <select 
+            <select
               value={filters.type}
-              onChange={(e) => setFilters(prev => ({...prev, type: e.target.value}))}
-              className="w-full p-2 border rounded"
+              onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+              className="w-full p-2 border border-gray-400 rounded"
             >
               <option value="">Tutte le Tipologie</option>
               {LISTS.COURSE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -548,11 +568,10 @@ const StudentsView: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4 hidden md:table-cell">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                          student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' : 
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' :
                           student.enrollment_status === 'Prenotato' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
+                            'bg-gray-100 text-gray-600'
+                          }`}>
                           {student.enrollment_status || 'Da definire'}
                         </span>
                         <div className="text-xs text-gray-400 mt-1">
@@ -570,13 +589,13 @@ const StudentsView: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-4 text-right">
-                        <button 
+                        <button
                           onClick={() => handleEdit(student)}
                           className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-semibold"
                         >
                           Modifica
                         </button>
-                        <button 
+                        <button
                           onClick={() => student.id && handleDelete(student.id)}
                           className="text-red-500 hover:text-red-700 text-sm font-semibold"
                         >
@@ -605,8 +624,8 @@ const StudentsView: React.FC = () => {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => setViewMode('list')} 
+          <button
+            onClick={() => setViewMode('list')}
             className="w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-gray-500 hover:text-nam-red hover:bg-gray-50 transition-all"
           >
             <i className="fas fa-arrow-left"></i>
@@ -620,8 +639,8 @@ const StudentsView: React.FC = () => {
             </p>
           </div>
         </div>
-        <button 
-          onClick={handleSubmit} 
+        <button
+          onClick={handleSubmit}
           disabled={loading}
           className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold flex items-center"
         >
@@ -642,11 +661,10 @@ const StudentsView: React.FC = () => {
           <button
             key={idx}
             onClick={() => setActiveTab(idx)}
-            className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${
-              activeTab === idx 
-                ? 'border-nam-red text-nam-red font-bold bg-red-50' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === idx
+              ? 'border-nam-red text-nam-red font-bold bg-red-50'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
           >
             {idx + 1}. {tab}
           </button>
@@ -654,7 +672,7 @@ const StudentsView: React.FC = () => {
       </div>
 
       {/* Form Content */}
-      <form className="bg-white rounded-lg shadow p-6 min-h-[500px]">
+      <form className="bg-white rounded-lg shadow p-6 min-h-[500px]" style={{ border: '2px solid #1F4FE0' }}>
         {activeTab === 0 && renderTab1_Anagrafica()}
         {activeTab === 1 && renderTab2_Contatti()}
         {activeTab === 2 && renderTab3_Didattica()}

@@ -1,4 +1,4 @@
-export type Role = 'direzione' | 'segreteria' | 'docente';
+export type Role = 'direzione' | 'segreteria';
 
 export type View = 'dashboard' | 'crm' | 'didactics' | 'students' | 'admin' | 'warehouse' | 'reports';
 
@@ -60,24 +60,24 @@ export interface Student {
   citizenship?: string;
   fiscal_code?: string;
   passport_number?: string;
-  
+
   // 2. Contatti
   email?: string;
   phone?: string;
   mobile_phone?: string;
   pec?: string;
-  
+
   // 3. Accessi e Credenziali
   is_web_access_enabled?: boolean;
   is_moodle_access_enabled?: boolean;
-  
+
   // 4. Residenza
   address?: string;
   zip_code?: string;
   city?: string;
   province?: string;
   country?: string;
-  
+
   // 5. Dati Fiscali
   vat_number?: string;
   billing_different?: boolean;
@@ -91,11 +91,12 @@ export interface Student {
   course_1?: string;
   course_2?: string;
   course_type?: string;
-  
+  enrolled_course?: string; // Corso effettivo di iscrizione - collega lo studente alle lezioni
+
   // 7. Marketing & Lead
   marketing_source?: string;
   lead_source?: string;
-  
+
   // 8. Workflow Iscrizione
   interview_status?: string;
   audition_status?: string;
@@ -103,19 +104,19 @@ export interface Student {
   lead_profession?: string;
   open_day_status?: string;
   enrollment_status?: string;
-  
+
   // 9. Info Aggiuntive
   job_title?: string;
   marital_status?: string;
   education_level?: string;
   is_retired?: boolean;
-  
+
   // 10. Gestione Interna
   notes?: string;
   location?: string;
   privacy_consent?: boolean;
   guardian_info?: string;
-  
+
   // 11. Notifiche
   fcm_token?: string;
 }
