@@ -28,6 +28,11 @@ const StudentsView: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<Student>>(initialFormState);
 
+  // --- STATO MESSAGGISTICA ---
+  const [showCommModal, setShowCommModal] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [commChannel, setCommChannel] = useState<'email' | 'push' | 'whatsapp'>('email');
+
   // --- LOGICA DI CARICAMENTO (READ) ---
   const fetchStudents = async () => {
     setLoading(true);
@@ -67,6 +72,22 @@ const StudentsView: React.FC = () => {
 
     return matchesSearch && matchesCourse && matchesType;
   });
+
+  // --- LOGICA SELEZIONE ---
+  const toggleSelectAll = () => {
+    if (selectedStudentIds.size === filteredStudents.length && filteredStudents.length > 0) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(filteredStudents.map(s => s.id!).filter(Boolean)));
+    }
+  };
+
+  const toggleSelectStudent = (id: string) => {
+    const newSet = new Set(selectedStudentIds);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedStudentIds(newSet);
+  };
 
   // --- LOGICA FORM ---
 
@@ -479,15 +500,23 @@ const StudentsView: React.FC = () => {
               {filteredStudents.length} Iscritti
             </span>
           </h1>
-          <button
-            onClick={() => {
-              setFormData(initialFormState);
-              setViewMode('form');
-            }}
-            className="bg-nam-red text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center transition-colors"
-          >
-            <i className="fas fa-plus mr-2"></i> Nuovo Iscritto
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setShowCommModal(true)}
+              className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 flex items-center transition-colors"
+            >
+              <i className="fas fa-paper-plane mr-2"></i> Invia Messaggio
+            </button>
+            <button
+              onClick={() => {
+                setFormData(initialFormState);
+                setViewMode('form');
+              }}
+              className="bg-nam-red text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center transition-colors"
+            >
+              <i className="fas fa-plus mr-2"></i> Nuovo Iscritto
+            </button>
+          </div>
         </div>
 
         {/* Filtri */}
@@ -535,6 +564,14 @@ const StudentsView: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
+                  <th className="p-4 border-b w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
+                    />
+                  </th>
                   <th className="p-4 border-b font-bold text-gray-600 text-sm">Allievo</th>
                   <th className="p-4 border-b font-bold text-gray-600 text-sm">Corso & Tipo</th>
                   <th className="p-4 border-b font-bold text-gray-600 text-sm hidden md:table-cell">Stato & Città</th>
@@ -545,7 +582,15 @@ const StudentsView: React.FC = () => {
               <tbody>
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
+                    <tr key={student.id} className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${selectedStudentIds.has(student.id!) ? 'bg-indigo-50' : ''}`}>
+                      <td className="p-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.has(student.id!)}
+                          onChange={() => toggleSelectStudent(student.id!)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
+                        />
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-3 flex-shrink-0">
@@ -615,7 +660,111 @@ const StudentsView: React.FC = () => {
             </table>
           </div>
         </div>
-      </div>
+
+        {/* COMMUNICATION MODAL */}
+        {
+          showCommModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+                <div className="bg-indigo-600 p-4 flex justify-between items-center text-white flex-shrink-0">
+                  <h3 className="font-bold text-lg"><i className="fas fa-paper-plane mr-2"></i> Invia Comunicazione</h3>
+                  <button onClick={() => setShowCommModal(false)} className="hover:bg-indigo-700 p-1 rounded transition-colors">
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto">
+                  {/* Target Selection */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Destinatari</label>
+                    <div className="flex flex-col sm:flex-row gap-4 p-3 bg-gray-50 rounded border border-gray-200">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="target"
+                          defaultChecked={selectedStudentIds.size > 0}
+                          disabled={selectedStudentIds.size === 0}
+                        />
+                        <span className={selectedStudentIds.size === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'}>
+                          Selezione Manuale ({selectedStudentIds.size})
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="target" defaultChecked={selectedStudentIds.size === 0} />
+                        <span className="text-gray-700 font-medium">
+                          Classe / Corso Corrente ({filteredStudents.length})
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Channel Selection */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Canale di Invio</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        onClick={() => setCommChannel('email')}
+                        className={`p-3 rounded border text-center transition-all ${commChannel === 'email' ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold ring-2 ring-blue-200 shadow-sm' : 'border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                      >
+                        <i className="fas fa-envelope mb-2 block text-2xl"></i>
+                        Email
+                      </button>
+                      <button
+                        onClick={() => setCommChannel('push')}
+                        className={`p-3 rounded border text-center transition-all ${commChannel === 'push' ? 'bg-purple-50 border-purple-500 text-purple-700 font-bold ring-2 ring-purple-200 shadow-sm' : 'border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                      >
+                        <i className="fas fa-mobile-alt mb-2 block text-2xl"></i>
+                        Push Notify
+                      </button>
+                      <button
+                        onClick={() => setCommChannel('whatsapp')}
+                        className={`p-3 rounded border text-center transition-all ${commChannel === 'whatsapp' ? 'bg-green-50 border-green-500 text-green-700 font-bold ring-2 ring-green-200 shadow-sm' : 'border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                      >
+                        <i className="fab fa-whatsapp mb-2 block text-2xl"></i>
+                        WhatsApp
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Message Content */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Messaggio</label>
+                    {commChannel === 'email' && (
+                      <input
+                        type="text"
+                        placeholder="Oggetto dell'email..."
+                        className="w-full p-2 border border-gray-300 rounded mb-3 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
+                      />
+                    )}
+                    <textarea
+                      rows={5}
+                      placeholder={commChannel === 'whatsapp' ? "Scrivi il messaggio WhatsApp..." : "Scrivi il contenuto..."}
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none resize-none"
+                    ></textarea>
+                    <p className="text-xs text-gray-500 mt-2 text-right">
+                      {commChannel === 'whatsapp' ? 'Nota: Verrà aperta l\'app WhatsApp Web per l\'invio.' :
+                        commChannel === 'email' ? 'Verrà inviata una email HTML con il template della scuola.' :
+                          'La notifica arriverà su tutti i dispositivi registrati degli studenti.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t flex-shrink-0">
+                  <button
+                    onClick={() => setShowCommModal(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                  >
+                    Annulla
+                  </button>
+                  <button className="px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors">
+                    <i className="fas fa-paper-plane"></i> Invia {selectedStudentIds.size > 0 ? `a ${selectedStudentIds.size} destinatari` : 'alla lista filtrata'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      </div >
     );
   }
 

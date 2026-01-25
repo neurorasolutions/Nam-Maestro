@@ -26,8 +26,8 @@ interface AiContext {
 }
 
 const PIXELS_PER_HOUR = 60; // 1 hour = 60px height
-const START_HOUR = 9; // Calendar starts at 9:00
-const END_HOUR = 21; // Calendar ends at 21:00
+const START_HOUR = 8; // Calendar starts at 8:00
+const END_HOUR = 23; // Calendar ends at 23:00
 const SNAP_MINUTES = 15; // Drag snaps to nearest 15 min
 
 const CalendarView: React.FC = () => {
@@ -697,24 +697,102 @@ const CalendarView: React.FC = () => {
     const monday = new Date(currentDate); monday.setDate(diff);
     const weekDates = Array.from({ length: 6 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return { dayName: d.toLocaleDateString('it-IT', { weekday: 'short' }), dayNum: d.getDate(), fullDate: d }; });
     const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+
     return (
       <div className="bg-white rounded shadow-sm border border-gray-300 overflow-hidden flex-1 flex flex-col">
-        <div className="flex border-b border-gray-300 bg-gray-50 text-center text-sm font-bold text-gray-600 sticky top-0 z-20 shadow-sm">
-          <div className="w-16 flex-shrink-0 py-3 border-r border-gray-300 bg-gray-50 flex items-center justify-center">Orario</div>
-          {weekDates.map((d, i) => { const isToday = d.fullDate.toDateString() === new Date().toDateString(); return (<div key={i} className={`flex-1 py-3 border-r border-gray-300 ${isToday ? 'bg-blue-50 text-nam-blue' : 'bg-gray-50'}`}>{capitalize(d.dayName)} {d.dayNum}</div>); })}
+        {/* Header con giorni - 7 colonne: 1 orario + 6 giorni */}
+        <div className="grid grid-cols-[64px_repeat(6,1fr)] border-b border-gray-300 bg-gray-50 text-center text-sm font-bold text-gray-600 sticky top-0 z-20 shadow-sm">
+          <div className="py-3 border-r border-gray-300 bg-gray-50 flex items-center justify-center">Orario</div>
+          {weekDates.map((d, i) => {
+            const isToday = d.fullDate.toDateString() === new Date().toDateString();
+            return (
+              <div key={i} className={`py-3 border-r border-gray-300 last:border-r-0 ${isToday ? 'bg-blue-50 text-nam-blue' : 'bg-gray-50'}`}>
+                {capitalize(d.dayName)} {d.dayNum}
+              </div>
+            );
+          })}
         </div>
-        <div className="flex-1 overflow-y-auto relative custom-scrollbar">
-          <div className="flex relative" style={{ height: `${hours.length * PIXELS_PER_HOUR}px` }}>
-            <div className="w-16 flex-shrink-0 border-r border-gray-300 bg-white z-10">
-              {hours.map(h => (<div key={h} className="border-b border-gray-300 text-xs text-gray-400 font-mono text-right pr-2 pt-1 relative" style={{ height: `${PIXELS_PER_HOUR}px` }}><span className="-top-3 relative">{h}:00</span></div>))}
+
+        {/* Griglia ore - stessa struttura dell'header */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="grid grid-cols-[64px_repeat(6,1fr)]">
+            {/* Colonna orari */}
+            <div className="border-r border-gray-300 bg-white">
+              {hours.map((h, idx) => (
+                <div
+                  key={h}
+                  className="border-b border-gray-200 text-xs text-gray-400 font-mono text-right pr-2 flex items-center justify-end"
+                  style={{ height: `${PIXELS_PER_HOUR}px` }}
+                >
+                  {h}:00
+                </div>
+              ))}
             </div>
+
+            {/* Colonne giorni */}
             {weekDates.map((d, dayIndex) => {
-              const dayEvents = events.filter(e => { const sameDay = e.date.getDate() === d.fullDate.getDate() && e.date.getMonth() === d.fullDate.getMonth() && e.date.getFullYear() === d.fullDate.getFullYear(); if (!sameDay) return false; if (selectedTeacher && !e.title.includes(selectedTeacher)) return false; if (selectedRoom && e.room !== selectedRoom) return false; if (selectedCourse && !e.title.includes(selectedCourse)) return false; return true; });
+              const dayEvents = events.filter(e => {
+                const sameDay = e.date.getDate() === d.fullDate.getDate() &&
+                  e.date.getMonth() === d.fullDate.getMonth() &&
+                  e.date.getFullYear() === d.fullDate.getFullYear();
+                if (!sameDay) return false;
+                if (selectedTeacher && !e.title.includes(selectedTeacher)) return false;
+                if (selectedRoom && e.room !== selectedRoom) return false;
+                if (selectedCourse && !e.title.includes(selectedCourse)) return false;
+                return true;
+              });
+
               return (
-                <div key={dayIndex} className="flex-1 border-r border-gray-300 relative group bg-white" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, d.fullDate)}>
-                  {hours.map(h => (<div key={h} className="border-b border-gray-300 w-full absolute pointer-events-none" style={{ top: `${(h - START_HOUR) * PIXELS_PER_HOUR}px`, height: '1px' }}></div>))}
-                  {dayEvents.map(ev => { const style = getEventStyle(ev.time); return (<div key={ev.id} draggable onDragStart={(evt) => handleDragStart(evt, ev.id)} onDoubleClick={(evt) => handleEventDoubleClick(evt, ev)} className={`absolute left-0.5 right-0.5 rounded shadow-md p-2 text-xs text-white cursor-move hover:brightness-110 hover:z-20 transition-all overflow-hidden ${ev.type === 'lesson' ? 'bg-nam-yellow/90 border-l-4 border-yellow-600' : ev.type === 'collective' ? 'bg-nam-blue/90 border-l-4 border-blue-600' : 'bg-nam-red/90 border-l-4 border-red-600'} ${draggedEventId === ev.id ? 'opacity-40' : 'z-10'}`} style={style}><div className="font-bold truncate">{ev.title}</div><div className="flex justify-between mt-1 text-[10px] opacity-90"><span>{ev.time}</span>{ev.isHybrid && <i className="fas fa-video"></i>}</div><div className="mt-1 opacity-80 truncate">{ev.room}</div></div>); })}
-                  {d.fullDate.toDateString() === new Date().toDateString() && (<div className="absolute w-full border-t-2 border-red-500 z-30 pointer-events-none" style={{ top: '45%' }}><div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full"></div></div>)}
+                <div
+                  key={dayIndex}
+                  className="border-r border-gray-300 last:border-r-0 relative bg-white"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, d.fullDate)}
+                  style={{ minHeight: `${hours.length * PIXELS_PER_HOUR}px` }}
+                >
+                  {/* Righe orarie di sfondo - linee orizzontali visibili */}
+                  {hours.map(h => (
+                    <div
+                      key={h}
+                      className="border-b border-gray-300 absolute w-full"
+                      style={{ top: `${(h - START_HOUR) * PIXELS_PER_HOUR}px`, height: `${PIXELS_PER_HOUR}px` }}
+                    />
+                  ))}
+
+                  {/* Eventi */}
+                  {dayEvents.map(ev => {
+                    const style = getEventStyle(ev.time);
+                    return (
+                      <div
+                        key={ev.id}
+                        draggable
+                        onDragStart={(evt) => handleDragStart(evt, ev.id)}
+                        onDoubleClick={(evt) => handleEventDoubleClick(evt, ev)}
+                        className={`absolute left-0.5 right-0.5 rounded shadow-md p-2 text-xs text-white cursor-move hover:brightness-110 hover:z-20 transition-all overflow-hidden ${ev.type === 'lesson' ? 'bg-nam-yellow/90 border-l-4 border-yellow-600' :
+                          ev.type === 'collective' ? 'bg-nam-blue/90 border-l-4 border-blue-600' :
+                            'bg-nam-red/90 border-l-4 border-red-600'
+                          } ${draggedEventId === ev.id ? 'opacity-40' : 'z-10'}`}
+                        style={style}
+                      >
+                        <div className="font-bold truncate">{ev.title}</div>
+                        <div className="flex justify-between mt-1 text-[10px] opacity-90">
+                          <span>{ev.time}</span>
+                          {ev.isHybrid && <i className="fas fa-video"></i>}
+                        </div>
+                        <div className="mt-1 opacity-80 truncate">{ev.room}</div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Linea ora corrente */}
+                  {d.fullDate.toDateString() === new Date().toDateString() && (
+                    <div
+                      className="absolute w-full border-t-2 border-red-500 z-30 pointer-events-none"
+                      style={{ top: `${((new Date().getHours() - START_HOUR) + (new Date().getMinutes() / 60)) * PIXELS_PER_HOUR}px` }}
+                    >
+                      <div className="absolute -left-1 -top-1.5 w-3 h-3 bg-red-500 rounded-full"></div>
+                    </div>
+                  )}
                 </div>
               );
             })}
