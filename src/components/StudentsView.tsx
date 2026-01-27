@@ -28,6 +28,78 @@ const StudentsView: React.FC = () => {
 
   const [formData, setFormData] = useState<Partial<Student>>(initialFormState);
 
+  // --- STATO VALIDAZIONE ---
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Definizione campi obbligatori con etichette e tab di appartenenza
+  const REQUIRED_FIELDS: { field: keyof Student; label: string; tab: number }[] = [
+    // Tab 0 - Anagrafica
+    { field: 'first_name', label: 'Nome', tab: 0 },
+    { field: 'last_name', label: 'Cognome', tab: 0 },
+    { field: 'gender', label: 'Genere', tab: 0 },
+    { field: 'date_of_birth', label: 'Data di Nascita', tab: 0 },
+    { field: 'birth_place', label: 'Luogo di Nascita', tab: 0 },
+    { field: 'birth_province', label: 'Provincia di Nascita', tab: 0 },
+    { field: 'birth_country', label: 'Paese di Nascita', tab: 0 },
+    { field: 'fiscal_code', label: 'Codice Fiscale', tab: 0 },
+    { field: 'citizenship', label: 'Cittadinanza', tab: 0 },
+    { field: 'education_level', label: 'Grado di Istruzione', tab: 0 },
+    // Tab 1 - Contatti & Residenza
+    { field: 'email', label: 'Email', tab: 1 },
+    { field: 'mobile_phone', label: 'Cellulare', tab: 1 },
+    { field: 'phone', label: 'Telefono', tab: 1 },
+    { field: 'address', label: 'Indirizzo', tab: 1 },
+    { field: 'zip_code', label: 'CAP', tab: 1 },
+    { field: 'city', label: 'Città', tab: 1 },
+    { field: 'province', label: 'Provincia di Residenza', tab: 1 },
+    { field: 'country', label: 'Paese di Residenza', tab: 1 },
+    // Tab 2 - Didattica & Corsi
+    { field: 'course_1', label: 'Primo Corso di Interesse', tab: 2 },
+    { field: 'course_2', label: 'Secondo Corso di Interesse', tab: 2 },
+    { field: 'course_type', label: 'Tipologia Corso', tab: 2 },
+    { field: 'enrolled_course', label: 'Corso di Iscrizione (Effettivo)', tab: 2 },
+    { field: 'marketing_source', label: 'Come ci hai conosciuto', tab: 2 },
+    { field: 'lead_source', label: 'Fonte Lead', tab: 2 },
+    { field: 'enrollment_status', label: 'Stato Iscrizione', tab: 2 },
+    { field: 'open_day_status', label: 'Open Day', tab: 2 },
+    { field: 'location', label: 'Sede di Riferimento', tab: 2 },
+  ];
+
+  // Funzione di validazione
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    REQUIRED_FIELDS.forEach(({ field, label }) => {
+      const value = formData[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        errors[field] = `${label} è obbligatorio`;
+      }
+    });
+
+    // Validazione privacy consent (checkbox)
+    if (!formData.privacy_consent) {
+      errors['privacy_consent'] = 'Il Consenso Privacy è obbligatorio';
+    }
+
+    // Validazione email formato
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors['email'] = 'Formato email non valido';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Trova il primo tab con errori
+  const getFirstTabWithError = (): number => {
+    const errorFields = Object.keys(validationErrors);
+    for (const { field, tab } of REQUIRED_FIELDS) {
+      if (errorFields.includes(field)) return tab;
+    }
+    if (errorFields.includes('privacy_consent')) return 3;
+    return 0;
+  };
+
   // --- STATO MESSAGGISTICA ---
   const [showCommModal, setShowCommModal] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
@@ -120,6 +192,27 @@ const StudentsView: React.FC = () => {
     }));
   };
 
+  // Helper per classi CSS con errore
+  const getInputClass = (fieldName: string, baseClass: string = 'w-full p-2 border border-gray-400 rounded') => {
+    return validationErrors[fieldName]
+      ? `${baseClass} border-red-500 bg-red-50`
+      : baseClass;
+  };
+
+  // Pulisce errore quando l'utente modifica il campo
+  const handleChangeWithValidation = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name } = e.target;
+    handleChange(e);
+    // Rimuovi l'errore per questo campo
+    if (validationErrors[name]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) return;
     const file = event.target.files[0];
@@ -144,8 +237,20 @@ const StudentsView: React.FC = () => {
   // --- IL CUORE DEL SISTEMA: SALVATAGGIO & INVITO ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMessage(null);
+
+    // Validazione prima del submit
+    if (!validateForm()) {
+      const firstErrorTab = getFirstTabWithError();
+      setActiveTab(firstErrorTab);
+      setMessage({
+        type: 'error',
+        text: 'Compila tutti i campi obbligatori prima di procedere. I campi mancanti sono evidenziati in rosso.'
+      });
+      return;
+    }
+
+    setLoading(true);
 
     try {
       // 1. MODIFICA (Se l'ID esiste già, aggiorniamo solo i dati senza rimandare l'invito)
@@ -237,51 +342,68 @@ const StudentsView: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Nome *</label>
-            <input name="first_name" required value={formData.first_name} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <input name="first_name" value={formData.first_name} onChange={handleChangeWithValidation} className={getInputClass('first_name')} />
+            {validationErrors.first_name && <span className="text-xs text-red-500">{validationErrors.first_name}</span>}
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Cognome *</label>
-            <input name="last_name" required value={formData.last_name} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <input name="last_name" value={formData.last_name} onChange={handleChangeWithValidation} className={getInputClass('last_name')} />
+            {validationErrors.last_name && <span className="text-xs text-red-500">{validationErrors.last_name}</span>}
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Genere</label>
-          <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+          <label className="block text-xs font-bold text-gray-700 uppercase">Genere *</label>
+          <select name="gender" value={formData.gender} onChange={handleChangeWithValidation} className={getInputClass('gender')}>
             <option value="">Seleziona...</option>
             {LISTS.GENDER.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+          {validationErrors.gender && <span className="text-xs text-red-500">{validationErrors.gender}</span>}
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Data di Nascita</label>
-          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+          <label className="block text-xs font-bold text-gray-700 uppercase">Data di Nascita *</label>
+          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChangeWithValidation} className={getInputClass('date_of_birth')} />
+          {validationErrors.date_of_birth && <span className="text-xs text-red-500">{validationErrors.date_of_birth}</span>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Luogo Nascita</label>
-            <input name="birth_place" value={formData.birth_place} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Luogo Nascita *</label>
+            <input name="birth_place" value={formData.birth_place} onChange={handleChangeWithValidation} className={getInputClass('birth_place')} />
+            {validationErrors.birth_place && <span className="text-xs text-red-500">{validationErrors.birth_place}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Provincia</label>
-            <input name="birth_province" value={formData.birth_province} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" maxLength={2} />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Provincia Nascita *</label>
+            <input name="birth_province" value={formData.birth_province} onChange={handleChangeWithValidation} className={getInputClass('birth_province')} maxLength={2} />
+            {validationErrors.birth_province && <span className="text-xs text-red-500">{validationErrors.birth_province}</span>}
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Paese Nascita</label>
-          <input name="birth_country" value={formData.birth_country} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+          <label className="block text-xs font-bold text-gray-700 uppercase">Paese Nascita *</label>
+          <input name="birth_country" value={formData.birth_country} onChange={handleChangeWithValidation} className={getInputClass('birth_country')} />
+          {validationErrors.birth_country && <span className="text-xs text-red-500">{validationErrors.birth_country}</span>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Codice Fiscale</label>
-            <input name="fiscal_code" value={formData.fiscal_code} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Codice Fiscale *</label>
+            <input name="fiscal_code" value={formData.fiscal_code} onChange={handleChangeWithValidation} className={getInputClass('fiscal_code')} />
+            {validationErrors.fiscal_code && <span className="text-xs text-red-500">{validationErrors.fiscal_code}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Cittadinanza</label>
-            <input name="citizenship" value={formData.citizenship} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Cittadinanza *</label>
+            <input name="citizenship" value={formData.citizenship} onChange={handleChangeWithValidation} className={getInputClass('citizenship')} />
+            {validationErrors.citizenship && <span className="text-xs text-red-500">{validationErrors.citizenship}</span>}
           </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-700 uppercase">Grado di Istruzione *</label>
+          <select name="education_level" value={formData.education_level} onChange={handleChangeWithValidation} className={getInputClass('education_level')}>
+            <option value="">Seleziona...</option>
+            {LISTS.EDUCATION_LEVELS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+          {validationErrors.education_level && <span className="text-xs text-red-500">{validationErrors.education_level}</span>}
         </div>
       </div>
     </div>
@@ -293,16 +415,19 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Recapiti</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Email *</label>
-          <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full p-2 border rounded bg-yellow-50" />
+          <input type="email" name="email" value={formData.email} onChange={handleChangeWithValidation} className={getInputClass('email', 'w-full p-2 border rounded bg-yellow-50')} />
+          {validationErrors.email && <span className="text-xs text-red-500">{validationErrors.email}</span>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Cellulare</label>
-            <input name="mobile_phone" value={formData.mobile_phone} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Cellulare *</label>
+            <input name="mobile_phone" value={formData.mobile_phone} onChange={handleChangeWithValidation} className={getInputClass('mobile_phone')} />
+            {validationErrors.mobile_phone && <span className="text-xs text-red-500">{validationErrors.mobile_phone}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Telefono</label>
-            <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Telefono *</label>
+            <input name="phone" value={formData.phone} onChange={handleChangeWithValidation} className={getInputClass('phone')} />
+            {validationErrors.phone && <span className="text-xs text-red-500">{validationErrors.phone}</span>}
           </div>
         </div>
 
@@ -322,27 +447,32 @@ const StudentsView: React.FC = () => {
       <div className="space-y-4">
         <h3 className="font-bold text-nam-blue border-b pb-1">Residenza</h3>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Indirizzo</label>
-          <input name="address" value={formData.address} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+          <label className="block text-xs font-bold text-gray-700 uppercase">Indirizzo *</label>
+          <input name="address" value={formData.address} onChange={handleChangeWithValidation} className={getInputClass('address')} />
+          {validationErrors.address && <span className="text-xs text-red-500">{validationErrors.address}</span>}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-700 uppercase">CAP</label>
-            <input name="zip_code" value={formData.zip_code} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">CAP *</label>
+            <input name="zip_code" value={formData.zip_code} onChange={handleChangeWithValidation} className={getInputClass('zip_code')} />
+            {validationErrors.zip_code && <span className="text-xs text-red-500">{validationErrors.zip_code}</span>}
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-bold text-gray-700 uppercase">Città</label>
-            <input name="city" value={formData.city} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Città *</label>
+            <input name="city" value={formData.city} onChange={handleChangeWithValidation} className={getInputClass('city')} />
+            {validationErrors.city && <span className="text-xs text-red-500">{validationErrors.city}</span>}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Provincia</label>
-            <input name="province" value={formData.province} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Provincia *</label>
+            <input name="province" value={formData.province} onChange={handleChangeWithValidation} className={getInputClass('province')} />
+            {validationErrors.province && <span className="text-xs text-red-500">{validationErrors.province}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Paese</label>
-            <input name="country" value={formData.country} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded" />
+            <label className="block text-xs font-bold text-gray-700 uppercase">Paese *</label>
+            <input name="country" value={formData.country} onChange={handleChangeWithValidation} className={getInputClass('country')} />
+            {validationErrors.country && <span className="text-xs text-red-500">{validationErrors.country}</span>}
           </div>
         </div>
       </div>
@@ -354,31 +484,34 @@ const StudentsView: React.FC = () => {
       <div className="space-y-4">
         <h3 className="font-bold text-nam-blue border-b pb-1">Interessi & Corsi</h3>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Primo Corso di Interesse</label>
-          <select name="course_1" value={formData.course_1} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+          <label className="block text-xs font-bold text-gray-700 uppercase">Primo Corso di Interesse *</label>
+          <select name="course_1" value={formData.course_1} onChange={handleChangeWithValidation} className={getInputClass('course_1')}>
             <option value="">Seleziona...</option>
             {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {validationErrors.course_1 && <span className="text-xs text-red-500">{validationErrors.course_1}</span>}
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Secondo Corso di Interesse</label>
-          <select name="course_2" value={formData.course_2} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+          <label className="block text-xs font-bold text-gray-700 uppercase">Secondo Corso di Interesse *</label>
+          <select name="course_2" value={formData.course_2} onChange={handleChangeWithValidation} className={getInputClass('course_2')}>
             <option value="">Seleziona...</option>
             {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {validationErrors.course_2 && <span className="text-xs text-red-500">{validationErrors.course_2}</span>}
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Tipologia Corso</label>
-          <select name="course_type" value={formData.course_type} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+          <label className="block text-xs font-bold text-gray-700 uppercase">Tipologia Corso *</label>
+          <select name="course_type" value={formData.course_type} onChange={handleChangeWithValidation} className={getInputClass('course_type')}>
             <option value="">Seleziona...</option>
             {LISTS.COURSE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {validationErrors.course_type && <span className="text-xs text-red-500">{validationErrors.course_type}</span>}
         </div>
 
         {/* CORSO DI ISCRIZIONE EFFETTIVO - scrive in enrolled_course */}
         <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(11, 19, 43, 0.05)', border: '2px solid #0B132B' }}>
           <label className="block text-xs font-bold uppercase mb-1" style={{ color: '#0B132B' }}>
-            📌 Corso di Iscrizione (Effettivo)
+            📌 Corso di Iscrizione (Effettivo) *
           </label>
           <p className="text-xs mb-2" style={{ color: '#0B132B' }}>
             Seleziona il corso specifico a cui lo studente si iscrive. Questo campo collega lo studente alle lezioni.
@@ -386,13 +519,14 @@ const StudentsView: React.FC = () => {
           <select
             name="enrolled_course"
             value={formData.enrolled_course || ''}
-            onChange={handleChange}
-            className="w-full p-2 rounded font-bold bg-white"
-            style={{ border: '2px solid #0B132B', color: '#0B132B' }}
+            onChange={handleChangeWithValidation}
+            className={`w-full p-2 rounded font-bold bg-white ${validationErrors.enrolled_course ? 'border-red-500 bg-red-50' : ''}`}
+            style={{ border: validationErrors.enrolled_course ? '2px solid #ef4444' : '2px solid #0B132B', color: '#0B132B' }}
           >
             <option value="">-- Seleziona Corso Effettivo --</option>
             {COURSES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {validationErrors.enrolled_course && <span className="text-xs text-red-500">{validationErrors.enrolled_course}</span>}
         </div>
       </div>
 
@@ -400,44 +534,49 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Origine & Workflow</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Come ci hai conosciuto</label>
-            <select name="marketing_source" value={formData.marketing_source} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+            <label className="block text-xs font-bold text-gray-700 uppercase">Come ci hai conosciuto *</label>
+            <select name="marketing_source" value={formData.marketing_source} onChange={handleChangeWithValidation} className={getInputClass('marketing_source')}>
               <option value="">Seleziona...</option>
               {LISTS.MARKETING_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {validationErrors.marketing_source && <span className="text-xs text-red-500">{validationErrors.marketing_source}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Fonte Lead</label>
-            <select name="lead_source" value={formData.lead_source} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+            <label className="block text-xs font-bold text-gray-700 uppercase">Fonte Lead *</label>
+            <select name="lead_source" value={formData.lead_source} onChange={handleChangeWithValidation} className={getInputClass('lead_source')}>
               <option value="">Seleziona...</option>
               {LISTS.LEAD_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {validationErrors.lead_source && <span className="text-xs text-red-500">{validationErrors.lead_source}</span>}
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Stato Iscrizione</label>
-            <select name="enrollment_status" value={formData.enrollment_status} onChange={handleChange} className="w-full p-2 border rounded font-bold text-nam-red">
+            <label className="block text-xs font-bold text-gray-700 uppercase">Stato Iscrizione *</label>
+            <select name="enrollment_status" value={formData.enrollment_status} onChange={handleChangeWithValidation} className={`${getInputClass('enrollment_status')} font-bold text-nam-red`}>
               <option value="">Seleziona...</option>
               {LISTS.ENROLLMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {validationErrors.enrollment_status && <span className="text-xs text-red-500">{validationErrors.enrollment_status}</span>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase">Open Day</label>
-            <select name="open_day_status" value={formData.open_day_status} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+            <label className="block text-xs font-bold text-gray-700 uppercase">Open Day *</label>
+            <select name="open_day_status" value={formData.open_day_status} onChange={handleChangeWithValidation} className={getInputClass('open_day_status')}>
               <option value="">Seleziona...</option>
               {LISTS.OPEN_DAY.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {validationErrors.open_day_status && <span className="text-xs text-red-500">{validationErrors.open_day_status}</span>}
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-gray-700 uppercase">Sede di Riferimento</label>
-          <select name="location" value={formData.location} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+          <label className="block text-xs font-bold text-gray-700 uppercase">Sede di Riferimento *</label>
+          <select name="location" value={formData.location} onChange={handleChangeWithValidation} className={getInputClass('location')}>
             <option value="">Seleziona...</option>
             {LISTS.LOCATIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+          {validationErrors.location && <span className="text-xs text-red-500">{validationErrors.location}</span>}
         </div>
       </div>
     </div>
@@ -475,12 +614,13 @@ const StudentsView: React.FC = () => {
           <textarea name="notes" value={formData.notes} onChange={handleChange} rows={4} className="w-full p-2 border border-gray-400 rounded" />
         </div>
 
-        <div className="bg-yellow-50 p-4 border border-yellow-200 rounded">
+        <div className={`p-4 border rounded ${validationErrors.privacy_consent ? 'bg-red-50 border-red-300' : 'bg-yellow-50 border-yellow-200'}`}>
           <label className="flex items-center space-x-3">
-            <input type="checkbox" name="privacy_consent" checked={formData.privacy_consent} onChange={handleChange} className="h-5 w-5 text-nam-green" />
+            <input type="checkbox" name="privacy_consent" checked={formData.privacy_consent} onChange={handleChangeWithValidation} className={`h-5 w-5 ${validationErrors.privacy_consent ? 'text-red-500' : 'text-nam-green'}`} />
             <div>
-              <span className="block font-bold text-sm text-gray-800">Consenso Privacy Firmato</span>
+              <span className="block font-bold text-sm text-gray-800">Consenso Privacy Firmato *</span>
               <span className="text-xs text-gray-500">Il modulo cartaceo deve essere archiviato in amministrazione.</span>
+              {validationErrors.privacy_consent && <span className="block text-xs text-red-500 mt-1">{validationErrors.privacy_consent}</span>}
             </div>
           </label>
         </div>
@@ -801,6 +941,21 @@ const StudentsView: React.FC = () => {
       {message && (
         <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {message.text}
+        </div>
+      )}
+
+      {/* Riepilogo errori di validazione */}
+      {Object.keys(validationErrors).length > 0 && (
+        <div className="mb-4 p-4 rounded bg-red-50 border-2 border-red-300">
+          <div className="flex items-center mb-2">
+            <i className="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+            <span className="font-bold text-red-700">Campi obbligatori mancanti:</span>
+          </div>
+          <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+            {Object.entries(validationErrors).map(([field, error]) => (
+              <li key={field}>{error}</li>
+            ))}
+          </ul>
         </div>
       )}
 

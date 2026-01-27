@@ -160,5 +160,28 @@ export const LISTS = {
 
   // Marketing & Lead Sources (usate per "Come ci hai conosciuto" e "Da dove arriva il contatto")
   LEAD_SOURCES: ['Sito Web', 'Passaparola', 'Social Media', 'Evento', 'Altro'],
-  MARKETING_SOURCES: ['Google', 'Facebook/Instagram', 'Amici', 'Volantino', 'Altro']
+
+  // Come ci hai conosciuto?
+  MARKETING_SOURCES: [
+    'Passa Parola',
+    'Sito',
+    'Google',
+    'Instagram',
+    'Youtube',
+    'Facebook',
+    'Tik Tok',
+    'ADV',
+    'Volantini'
+  ],
+
+  // Grado di Istruzione
+  EDUCATION_LEVELS: [
+    'Licenza Media',
+    'Diploma Superiore',
+    'Laurea Triennale',
+    'Laurea Magistrale',
+    'Master',
+    'Dottorato',
+    'Altro'
+  ]
 };
