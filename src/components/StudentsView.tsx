@@ -105,6 +105,30 @@ const StudentsView: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [commChannel, setCommChannel] = useState<'email' | 'push' | 'whatsapp'>('email');
 
+  // --- STATO MODAL INVITO ---
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteStudentId, setInviteStudentId] = useState<string>('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const defaultInviteEmailContent = `<h2>Benvenuto in NAM!</h2>
+<p>La tua iscrizione è stata confermata.</p>
+
+<p>Per iniziare il tuo percorso, segui questi due passaggi obbligatori:</p>
+
+<ol>
+  <li>
+    <strong>Imposta la tua Password:</strong><br/>
+    <a href="{{ .ConfirmationURL }}">Clicca qui per creare la tua password segreta</a>
+  </li>
+  <li>
+    <strong>Scarica l'App Studenti:</strong><br/>
+    <a href="https://maestro-app-smoky.vercel.app/">Clicca qui per accedere all'App Web</a>
+  </li>
+</ol>
+
+<p>A presto,<br/>Lo Staff NAM</p>`;
+  const [inviteEmailContent, setInviteEmailContent] = useState(defaultInviteEmailContent);
+
   // --- LOGICA DI CARICAMENTO (READ) ---
   const fetchStudents = async () => {
     setLoading(true);
@@ -210,6 +234,55 @@ const StudentsView: React.FC = () => {
         delete newErrors[name];
         return newErrors;
       });
+    }
+  };
+
+  // --- FUNZIONE INVIO INVITO ---
+  const handleSendInvite = async () => {
+    if (!inviteStudentId) {
+      setInviteMessage({ type: 'error', text: 'Seleziona uno studente' });
+      return;
+    }
+
+    const student = students.find(s => s.id === inviteStudentId);
+    if (!student || !student.email) {
+      setInviteMessage({ type: 'error', text: 'Studente non trovato o email mancante' });
+      return;
+    }
+
+    setInviteLoading(true);
+    setInviteMessage(null);
+
+    try {
+      const response = await fetch('/api/invite-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: student.email,
+          studentId: student.id,
+          firstName: student.first_name
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Errore invio invito');
+      }
+
+      setInviteMessage({ type: 'success', text: `Invito inviato con successo a ${student.email}!` });
+
+      // Chiudi il modal dopo 2 secondi
+      setTimeout(() => {
+        setShowInviteModal(false);
+        setInviteStudentId('');
+        setInviteMessage(null);
+        setInviteEmailContent(defaultInviteEmailContent);
+      }, 2000);
+
+    } catch (error: any) {
+      setInviteMessage({ type: 'error', text: error.message });
+    } finally {
+      setInviteLoading(false);
     }
   };
 
@@ -642,6 +715,17 @@ const StudentsView: React.FC = () => {
           </h1>
           <div className="flex space-x-3">
             <button
+              onClick={() => {
+                setShowInviteModal(true);
+                setInviteMessage(null);
+                setInviteStudentId('');
+                setInviteEmailContent(defaultInviteEmailContent);
+              }}
+              className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 flex items-center transition-colors"
+            >
+              <i className="fas fa-envelope-open-text mr-2"></i> Invia Invito
+            </button>
+            <button
               onClick={() => setShowCommModal(true)}
               className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 flex items-center transition-colors"
             >
@@ -650,6 +734,7 @@ const StudentsView: React.FC = () => {
             <button
               onClick={() => {
                 setFormData(initialFormState);
+                setValidationErrors({});
                 setViewMode('form');
               }}
               className="bg-nam-red text-white px-4 py-2 rounded shadow hover:bg-red-700 flex items-center transition-colors"
@@ -904,6 +989,105 @@ const StudentsView: React.FC = () => {
             </div>
           )
         }
+
+        {/* INVITE MODAL */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+              <div className="bg-green-600 p-4 flex justify-between items-center text-white flex-shrink-0">
+                <h3 className="font-bold text-lg"><i className="fas fa-envelope-open-text mr-2"></i> Invia Invito App</h3>
+                <button onClick={() => setShowInviteModal(false)} className="hover:bg-green-700 p-1 rounded transition-colors">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                {/* Messaggio di feedback */}
+                {inviteMessage && (
+                  <div className={`mb-4 p-3 rounded ${inviteMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <i className={`fas ${inviteMessage.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i>
+                    {inviteMessage.text}
+                  </div>
+                )}
+
+                {/* Selezione Studente */}
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Seleziona Studente *</label>
+                  <select
+                    value={inviteStudentId}
+                    onChange={(e) => setInviteStudentId(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-green-200 focus:border-green-500 outline-none"
+                  >
+                    <option value="">-- Seleziona uno studente --</option>
+                    {students.filter(s => s.email).map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.first_name} {s.last_name} - {s.email}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Vengono mostrati solo gli studenti con email registrata.
+                  </p>
+                </div>
+
+                {/* Anteprima Email */}
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Contenuto Email (Anteprima)
+                    <span className="font-normal text-gray-500 ml-2">- Modificabile</span>
+                  </label>
+                  <textarea
+                    value={inviteEmailContent}
+                    onChange={(e) => setInviteEmailContent(e.target.value)}
+                    rows={12}
+                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-green-200 focus:border-green-500 outline-none font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    Il link <code className="bg-gray-100 px-1 rounded">{'{{ .ConfirmationURL }}'}</code> verrà sostituito automaticamente da Supabase con il link di conferma univoco per lo studente.
+                  </p>
+                </div>
+
+                {/* Preview Rendered */}
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Anteprima Visiva</label>
+                  <div
+                    className="p-4 border border-gray-200 rounded bg-gray-50 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: inviteEmailContent.replace('{{ .ConfirmationURL }}', '#') }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t flex-shrink-0">
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleSendInvite}
+                  disabled={inviteLoading || !inviteStudentId}
+                  className={`px-6 py-2 rounded shadow font-bold flex items-center gap-2 transition-colors ${
+                    inviteLoading || !inviteStudentId
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  {inviteLoading ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i> Invio in corso...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-paper-plane"></i> Invia Invito
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div >
     );
   }
