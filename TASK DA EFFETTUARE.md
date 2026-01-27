@@ -4,7 +4,7 @@
 
 ## PRIORITA' ALTA - Funzionalita' Core/Bloccanti
 
-### 1. Validazione Dati Obbligatori Iscrizione
+### 1. Validazione Dati Obbligatori Iscrizione (FATTO)
 - [ ] Non permettere alla Segreteria/cliente di procedere con l'iscrizione se mancano dati obbligatori
 - [ ] Mostrare chiaramente quali campi sono mancanti
 
