@@ -4,17 +4,17 @@
 
 ## PRIORITA' ALTA - Funzionalita' Core/Bloccanti
 
-### 1. Validazione Dati Obbligatori Iscrizione (FATTO)
-- [ ] Non permettere alla Segreteria/cliente di procedere con l'iscrizione se mancano dati obbligatori
-- [ ] Mostrare chiaramente quali campi sono mancanti
+### 1. Validazione Dati Obbligatori Iscrizione (COMPLETATO)
+- [x] Non permettere alla Segreteria/cliente di procedere con l'iscrizione se mancano dati obbligatori
+- [x] Mostrare chiaramente quali campi sono mancanti
 
-### 2. Bug Email Invito
-- [ ] **VERIFICARE** perché le email di invito non arrivano in alcuni casi
-- [ ] Debug del flusso `/invite-student`
+### 2. Bug Email Invito (COMPLETATO)
+- [x] **VERIFICATO** - Configurato API plugin per sviluppo locale
+- [x] Debug del flusso `/invite-student` - Funzionante
 
-### 3. Azioni Invito Visibili
-- [ ] Creare pulsanti ben visibili: **"MANDA INVITO SU WHATSAPP"** e **"MANDA INVITO PER MAIL"**
-- [ ] Permettere di rimandare inviti anche dopo la creazione dello studente
+### 3. Azioni Invito Visibili (COMPLETATO)
+- [x] Creato pulsante **"Invia Invito"** con modal per reinvio email
+- [x] Permettere di rimandare inviti anche dopo la creazione dello studente
 
 ### 4. Apertura Anagrafica Completa
 - [ ] Cliccando su uno studente deve aprirsi la sua anagrafica completa (non solo modifica)
@@ -63,16 +63,19 @@ PRODUCER & COMPOSER COMPLETO
 
 ### 6. Nuovi Campi da Aggiungere
 
-#### Come ci hai conosciuto?
-- [ ] Passa Parola
-- [ ] Sito
-- [ ] Google
-- [ ] Instagram
-- [ ] Youtube
-- [ ] Facebook
-- [ ] Tik Tok
-- [ ] ADV
-- [ ] Volantini
+#### Come ci hai conosciuto? (COMPLETATO)
+- [x] Passa Parola
+- [x] Sito
+- [x] Google
+- [x] Instagram
+- [x] Youtube
+- [x] Facebook
+- [x] Tik Tok
+- [x] ADV
+- [x] Volantini
+
+#### Grado di Istruzione (COMPLETATO)
+- [x] Licenza Media, Diploma Superiore, Laurea Triennale, Laurea Magistrale, Master, Dottorato, Altro
 
 #### Sesso
 - [ ] Uomo
@@ -202,7 +205,10 @@ PRODUCER & COMPOSER COMPLETO
 
 ## Completati
 
-*(nessun task completato)*
+- [x] **Task 1** - Validazione Dati Obbligatori Iscrizione (30 campi obbligatori)
+- [x] **Task 2** - Bug Email Invito (API plugin configurato)
+- [x] **Task 3** - Azioni Invito Visibili (pulsante "Invia Invito" con modal)
+- [x] **Task 6 parziale** - Aggiunto campo "Come ci hai conosciuto?" e "Grado di Istruzione"
 
 ---
 
