@@ -1254,10 +1254,10 @@ const StudentsView: React.FC = () => {
                   <button
                     onClick={handleSendMessage}
                     disabled={sendingMessage}
-                    className={`px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors ${sendingMessage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors ${sendingMessage ? 'opacity-70 cursor-wait' : ''}`}
                   >
                     {sendingMessage ? (
-                      <><i className="fas fa-spinner fa-spin"></i> Invio in corso...</>
+                      <><i className="fas fa-spinner fa-spin"></i> Connessione al server email... (può richiedere alcuni secondi)</>
                     ) : (
                       <><i className="fas fa-paper-plane"></i> Invia a {
                         targetMode === 'manual'
