@@ -119,4 +119,10 @@ export interface Student {
 
   // 11. Notifiche
   fcm_token?: string;
+  notification_token?: string; // Token Firebase per push notifications
+  token_updated_at?: string;
+  token_status?: string;
+
+  // 12. Autenticazione
+  auth_user_id?: string;
 }

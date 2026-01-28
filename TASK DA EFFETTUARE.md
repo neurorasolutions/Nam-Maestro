@@ -207,7 +207,7 @@ PRODUCER & COMPOSER COMPLETO
 
 ## FUNZIONALITA' GESTIONALE COMPLETATE
 
-### 22. Sistema Messaggistica Email (COMPLETATO)
+### 22. Sistema Messaggistica Email (COMPLETATO - validare ipotesi Resend per migliorare velocità)
 - [x] Edge Function `send-email` per invio via Gmail SMTP
 - [x] Template HTML professionale per le email
 - [x] Modal "Invia Messaggio" con selezione destinatari:

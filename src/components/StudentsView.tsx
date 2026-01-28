@@ -416,7 +416,59 @@ const StudentsView: React.FC = () => {
       setCommMessage({ type: 'success', text: 'WhatsApp aperto. Nota: per invio multiplo serve WhatsApp Business API.' });
 
     } else if (commChannel === 'push') {
-      setCommMessage({ type: 'error', text: 'Push notifications: funzionalità in arrivo!' });
+      // Push Notifications via Firebase
+      if (!messageContent.trim()) {
+        setCommMessage({ type: 'error', text: 'Inserisci il contenuto della notifica' });
+        return;
+      }
+
+      // Filtra studenti con notification_token
+      const studentsWithToken = targetStudents.filter(s => s.notification_token);
+      if (studentsWithToken.length === 0) {
+        setCommMessage({ type: 'error', text: 'Nessuno studente selezionato ha l\'app installata con notifiche attive' });
+        return;
+      }
+
+      setSendingMessage(true);
+      setCommMessage(null);
+
+      try {
+        const tokens = studentsWithToken.map(s => s.notification_token!);
+
+        const { data, error } = await supabase.functions.invoke('send-push', {
+          body: {
+            tokens: tokens,
+            title: emailSubject || 'NAM - Nuova Audio Musicmedia',
+            body: messageContent,
+            data: { url: 'https://maestro-app-smoky.vercel.app' }
+          }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        setCommMessage({
+          type: 'success',
+          text: `Push notification inviata a ${studentsWithToken.length} studente/i!`
+        });
+
+        // Reset e chiudi dopo 2 secondi
+        setTimeout(() => {
+          setShowCommModal(false);
+          setEmailSubject('');
+          setMessageContent('');
+          setCommMessage(null);
+          setModalSelectedIds(new Set());
+          setTargetMode('manual');
+          setSelectedCourse('');
+          setStudentSearch('');
+        }, 2000);
+
+      } catch (error: any) {
+        setCommMessage({ type: 'error', text: 'Errore invio push: ' + error.message });
+      } finally {
+        setSendingMessage(false);
+      }
     }
   };
 
