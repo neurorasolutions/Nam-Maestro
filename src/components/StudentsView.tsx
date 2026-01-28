@@ -195,12 +195,19 @@ const StudentsView: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Sei sicuro di voler eliminare questo studente? L'azione è irreversibile.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo studente? L'azione è irreversibile.\n\nVerrà cancellato sia dalla lista studenti che dal sistema di autenticazione.")) return;
 
     try {
-      const { error } = await supabase.from('students').delete().eq('id', id);
+      // Chiama la Edge Function che cancella sia da students che da auth.users
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { student_id: id }
+      });
+
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       setStudents(prev => prev.filter(s => s.id !== id));
+      setMessage({ type: 'success', text: 'Studente eliminato completamente dal sistema.' });
     } catch (error: any) {
       alert("Errore cancellazione: " + error.message);
     }
@@ -1030,32 +1037,41 @@ const StudentsView: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Anteprima Email */}
+                {/* Anteprima Email Visiva */}
                 <div className="mb-4">
                   <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Contenuto Email (Anteprima)
-                    <span className="font-normal text-gray-500 ml-2">- Modificabile</span>
+                    <i className="fas fa-eye mr-2"></i>Anteprima Email
                   </label>
-                  <textarea
-                    value={inviteEmailContent}
-                    onChange={(e) => setInviteEmailContent(e.target.value)}
-                    rows={12}
-                    className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-green-200 focus:border-green-500 outline-none font-mono text-sm"
+                  <div
+                    className="p-5 border-2 border-green-200 rounded-lg bg-white shadow-inner prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: inviteEmailContent.replace('{{ .ConfirmationURL }}', '#') }}
                   />
                   <p className="text-xs text-gray-500 mt-2">
                     <i className="fas fa-info-circle mr-1"></i>
-                    Il link <code className="bg-gray-100 px-1 rounded">{'{{ .ConfirmationURL }}'}</code> verrà sostituito automaticamente da Supabase con il link di conferma univoco per lo studente.
+                    Il link di conferma verrà generato automaticamente da Supabase per ogni studente.
                   </p>
                 </div>
 
-                {/* Preview Rendered */}
-                <div className="mb-4">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Anteprima Visiva</label>
-                  <div
-                    className="p-4 border border-gray-200 rounded bg-gray-50 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: inviteEmailContent.replace('{{ .ConfirmationURL }}', '#') }}
-                  />
-                </div>
+                {/* Toggle Modifica Avanzata */}
+                <details className="mb-4">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800 flex items-center gap-2 p-2 bg-gray-100 rounded">
+                    <i className="fas fa-code"></i>
+                    Modifica HTML avanzata
+                    <span className="text-xs text-gray-400">(opzionale)</span>
+                  </summary>
+                  <div className="mt-2">
+                    <textarea
+                      value={inviteEmailContent}
+                      onChange={(e) => setInviteEmailContent(e.target.value)}
+                      rows={10}
+                      className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-green-200 focus:border-green-500 outline-none font-mono text-xs bg-gray-900 text-green-400"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      <i className="fas fa-exclamation-triangle mr-1 text-yellow-500"></i>
+                      Usa <code className="bg-gray-100 px-1 rounded">{'{{ .ConfirmationURL }}'}</code> per inserire il link di conferma.
+                    </p>
+                  </div>
+                </details>
               </div>
 
               <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t flex-shrink-0">
@@ -1068,11 +1084,10 @@ const StudentsView: React.FC = () => {
                 <button
                   onClick={handleSendInvite}
                   disabled={inviteLoading || !inviteStudentId}
-                  className={`px-6 py-2 rounded shadow font-bold flex items-center gap-2 transition-colors ${
-                    inviteLoading || !inviteStudentId
+                  className={`px-6 py-2 rounded shadow font-bold flex items-center gap-2 transition-colors ${inviteLoading || !inviteStudentId
                       ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                       : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
+                    }`}
                 >
                   {inviteLoading ? (
                     <>
