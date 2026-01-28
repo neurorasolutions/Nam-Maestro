@@ -116,8 +116,9 @@ PRODUCER & COMPOSER COMPLETO
   - Workshop specifici
   - Altri eventi personalizzabili
 
-### 8. WhatsApp al posto di SMS
-- [ ] Integrare WhatsApp per le comunicazioni (SMS troppo costoso)
+### 8. WhatsApp al posto di SMS (PARZIALE)
+- [x] Integrazione base WhatsApp Web (apre chat con messaggio precompilato)
+- [ ] Integrare WhatsApp Business API per invio massivo
 
 ### 9. Gestione Duplicati Intelligente
 - [ ] Se i dati esistono gia' (es. parenti/genitori con stessi dati), mostrare avviso
@@ -195,6 +196,34 @@ PRODUCER & COMPOSER COMPLETO
 
 ---
 
+## APP STUDENTI
+
+### 21. Installazione PWA (COMPLETATO)
+- [x] Bottone "Installa App sul Telefono" per Android al primo accesso
+- [x] Istruzioni installazione per iOS (Condividi > Aggiungi a Home)
+- [x] Prompt mostrato nella schermata impostazione password
+
+---
+
+## FUNZIONALITA' GESTIONALE COMPLETATE
+
+### 22. Sistema Messaggistica Email (COMPLETATO)
+- [x] Edge Function `send-email` per invio via Gmail SMTP
+- [x] Template HTML professionale per le email
+- [x] Modal "Invia Messaggio" con selezione destinatari:
+  - [x] Selezione Manuale con lista checkbox e ricerca
+  - [x] Selezione Per Corso con dropdown
+  - [x] Bottoni Seleziona tutti / Deseleziona tutti
+- [x] Email visibili nella cartella "Inviate" di Gmail
+- [x] Supporto invio a destinatari multipli
+
+### 23. Cancellazione Utenti Completa (COMPLETATO)
+- [x] Edge Function `delete-user` per cancellazione da students E auth.users
+- [x] Risolto problema utenti "orfani" nel sistema di autenticazione
+- [x] Possibilita' di reinviare inviti alla stessa email dopo cancellazione
+
+---
+
 ## NOTE PROCEDURA ISCRIZIONE IDEALE
 
 1. Mandare link per compilare anagrafica **OPPURE** far compilare alla segreteria
@@ -209,7 +238,11 @@ PRODUCER & COMPOSER COMPLETO
 - [x] **Task 2** - Bug Email Invito (API plugin configurato)
 - [x] **Task 3** - Azioni Invito Visibili (pulsante "Invia Invito" con modal)
 - [x] **Task 6 parziale** - Aggiunto campo "Come ci hai conosciuto?" e "Grado di Istruzione"
+- [x] **Task 21** - Installazione PWA App Studenti (Android + iOS)
+- [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
+- [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
+- [x] **Task 8 parziale** - WhatsApp Web integration base
 
 ---
 
-*Ultimo aggiornamento: 27 Gennaio 2026*
+*Ultimo aggiornamento: 28 Gennaio 2026*

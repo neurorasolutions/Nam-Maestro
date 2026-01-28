@@ -353,20 +353,15 @@ const StudentsView: React.FC = () => {
       try {
         const emails = studentsWithEmail.map(s => s.email!);
 
-        // Template HTML per l'email
+        // Template HTML semplice per l'email
         const htmlBody = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: #1a365d; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; font-size: 24px;">NAM - Nuova Audio Musicmedia</h1>
-            </div>
-            <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
-              <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3a86ff;">
-                ${messageContent.replace(/\n/g, '<br/>')}
-              </div>
-              <p style="color: #6c757d; font-size: 12px; margin-top: 20px; text-align: center;">
-                Questa email è stata inviata dalla Segreteria NAM
-              </p>
-            </div>
+          <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">
+            ${messageContent.replace(/\n/g, '<br/>')}
+            <br/><br/>
+            <p style="color: #666; font-size: 13px; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee;">
+              Segreteria NAM - Nuova Audio Musicmedia<br/>
+              <a href="https://www.nam.it" style="color: #1a365d;">www.nam.it</a>
+            </p>
           </div>
         `;
 
