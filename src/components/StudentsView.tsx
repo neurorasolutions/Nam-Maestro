@@ -104,6 +104,10 @@ const StudentsView: React.FC = () => {
   const [showCommModal, setShowCommModal] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [commChannel, setCommChannel] = useState<'email' | 'push' | 'whatsapp'>('email');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [commMessage, setCommMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // --- STATO MODAL INVITO ---
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -290,6 +294,111 @@ const StudentsView: React.FC = () => {
       setInviteMessage({ type: 'error', text: error.message });
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  // --- INVIO MESSAGGI (Email/Push/WhatsApp) ---
+  const handleSendMessage = async () => {
+    // Determina i destinatari
+    const useSelection = selectedStudentIds.size > 0;
+    const targetStudents = useSelection
+      ? students.filter(s => selectedStudentIds.has(s.id!))
+      : filteredStudents;
+
+    if (targetStudents.length === 0) {
+      setCommMessage({ type: 'error', text: 'Nessun destinatario selezionato' });
+      return;
+    }
+
+    // Validazione campi
+    if (commChannel === 'email') {
+      if (!emailSubject.trim()) {
+        setCommMessage({ type: 'error', text: 'Inserisci l\'oggetto dell\'email' });
+        return;
+      }
+      if (!messageContent.trim()) {
+        setCommMessage({ type: 'error', text: 'Inserisci il contenuto del messaggio' });
+        return;
+      }
+
+      // Filtra studenti con email
+      const studentsWithEmail = targetStudents.filter(s => s.email);
+      if (studentsWithEmail.length === 0) {
+        setCommMessage({ type: 'error', text: 'Nessuno studente selezionato ha un\'email valida' });
+        return;
+      }
+
+      setSendingMessage(true);
+      setCommMessage(null);
+
+      try {
+        const emails = studentsWithEmail.map(s => s.email!);
+
+        // Template HTML per l'email
+        const htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #1a365d; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; font-size: 24px;">NAM - Nuova Audio Musicmedia</h1>
+            </div>
+            <div style="background: #f8f9fa; padding: 30px; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
+              <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #3a86ff;">
+                ${messageContent.replace(/\n/g, '<br/>')}
+              </div>
+              <p style="color: #6c757d; font-size: 12px; margin-top: 20px; text-align: center;">
+                Questa email è stata inviata dalla Segreteria NAM
+              </p>
+            </div>
+          </div>
+        `;
+
+        const { data, error } = await supabase.functions.invoke('send-email', {
+          body: {
+            to: emails,
+            subject: emailSubject,
+            body: htmlBody,
+            isHtml: true
+          }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        setCommMessage({
+          type: 'success',
+          text: `Email inviata con successo a ${studentsWithEmail.length} studente/i!`
+        });
+
+        // Reset e chiudi dopo 2 secondi
+        setTimeout(() => {
+          setShowCommModal(false);
+          setEmailSubject('');
+          setMessageContent('');
+          setCommMessage(null);
+        }, 2000);
+
+      } catch (error: any) {
+        setCommMessage({ type: 'error', text: 'Errore invio: ' + error.message });
+      } finally {
+        setSendingMessage(false);
+      }
+
+    } else if (commChannel === 'whatsapp') {
+      // WhatsApp: apre WhatsApp Web con il messaggio
+      const studentsWithPhone = targetStudents.filter(s => s.mobile_phone || s.phone);
+      if (studentsWithPhone.length === 0) {
+        setCommMessage({ type: 'error', text: 'Nessuno studente selezionato ha un numero di telefono' });
+        return;
+      }
+
+      // Per ora apriamo WhatsApp per il primo studente (multi-invio richiede WhatsApp Business API)
+      const phone = (studentsWithPhone[0].mobile_phone || studentsWithPhone[0].phone || '').replace(/\D/g, '');
+      const text = encodeURIComponent(messageContent);
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+
+      setCommMessage({ type: 'success', text: 'WhatsApp aperto. Nota: per invio multiplo serve WhatsApp Business API.' });
+
+    } else if (commChannel === 'push') {
+      setCommMessage({ type: 'error', text: 'Push notifications: funzionalità in arrivo!' });
     }
   };
 
@@ -964,12 +1073,16 @@ const StudentsView: React.FC = () => {
                     {commChannel === 'email' && (
                       <input
                         type="text"
+                        value={emailSubject}
+                        onChange={(e) => setEmailSubject(e.target.value)}
                         placeholder="Oggetto dell'email..."
                         className="w-full p-2 border border-gray-300 rounded mb-3 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
                       />
                     )}
                     <textarea
                       rows={5}
+                      value={messageContent}
+                      onChange={(e) => setMessageContent(e.target.value)}
                       placeholder={commChannel === 'whatsapp' ? "Scrivi il messaggio WhatsApp..." : "Scrivi il contenuto..."}
                       className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none resize-none"
                     ></textarea>
@@ -979,17 +1092,38 @@ const StudentsView: React.FC = () => {
                           'La notifica arriverà su tutti i dispositivi registrati degli studenti.'}
                     </p>
                   </div>
+
+                  {/* Messaggio di feedback */}
+                  {commMessage && (
+                    <div className={`mt-4 p-3 rounded ${commMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      <i className={`fas ${commMessage.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i>
+                      {commMessage.text}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t flex-shrink-0">
                   <button
-                    onClick={() => setShowCommModal(false)}
+                    onClick={() => {
+                      setShowCommModal(false);
+                      setEmailSubject('');
+                      setMessageContent('');
+                      setCommMessage(null);
+                    }}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
                   >
                     Annulla
                   </button>
-                  <button className="px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors">
-                    <i className="fas fa-paper-plane"></i> Invia {selectedStudentIds.size > 0 ? `a ${selectedStudentIds.size} destinatari` : 'alla lista filtrata'}
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={sendingMessage}
+                    className={`px-6 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2 transition-colors ${sendingMessage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {sendingMessage ? (
+                      <><i className="fas fa-spinner fa-spin"></i> Invio in corso...</>
+                    ) : (
+                      <><i className="fas fa-paper-plane"></i> Invia {selectedStudentIds.size > 0 ? `a ${selectedStudentIds.size} destinatari` : 'alla lista filtrata'}</>
+                    )}
                   </button>
                 </div>
               </div>
