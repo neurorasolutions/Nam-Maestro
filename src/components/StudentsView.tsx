@@ -108,6 +108,10 @@ const StudentsView: React.FC = () => {
   const [messageContent, setMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [commMessage, setCommMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [targetMode, setTargetMode] = useState<'manual' | 'course'>('manual');
+  const [selectedCourse, setSelectedCourse] = useState('');
+  const [modalSelectedIds, setModalSelectedIds] = useState<Set<string>>(new Set());
+  const [studentSearch, setStudentSearch] = useState('');
 
   // --- STATO MODAL INVITO ---
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -299,14 +303,29 @@ const StudentsView: React.FC = () => {
 
   // --- INVIO MESSAGGI (Email/Push/WhatsApp) ---
   const handleSendMessage = async () => {
-    // Determina i destinatari
-    const useSelection = selectedStudentIds.size > 0;
-    const targetStudents = useSelection
-      ? students.filter(s => selectedStudentIds.has(s.id!))
-      : filteredStudents;
+    // Determina i destinatari in base alla modalità selezionata
+    let targetStudents: Student[] = [];
+
+    if (targetMode === 'manual') {
+      // Selezione manuale dal modal
+      if (modalSelectedIds.size === 0) {
+        setCommMessage({ type: 'error', text: 'Seleziona almeno uno studente dalla lista' });
+        return;
+      }
+      targetStudents = students.filter(s => modalSelectedIds.has(s.id!));
+    } else {
+      // Per corso
+      if (!selectedCourse) {
+        setCommMessage({ type: 'error', text: 'Seleziona un corso' });
+        return;
+      }
+      targetStudents = students.filter(s =>
+        s.enrolled_course === selectedCourse || s.course_1 === selectedCourse
+      );
+    }
 
     if (targetStudents.length === 0) {
-      setCommMessage({ type: 'error', text: 'Nessun destinatario selezionato' });
+      setCommMessage({ type: 'error', text: 'Nessun destinatario trovato per la selezione' });
       return;
     }
 
@@ -374,6 +393,10 @@ const StudentsView: React.FC = () => {
           setEmailSubject('');
           setMessageContent('');
           setCommMessage(null);
+          setModalSelectedIds(new Set());
+          setTargetMode('manual');
+          setSelectedCourse('');
+          setStudentSearch('');
         }, 2000);
 
       } catch (error: any) {
@@ -1015,28 +1038,143 @@ const StudentsView: React.FC = () => {
                 </div>
 
                 <div className="p-6 overflow-y-auto">
-                  {/* Target Selection */}
+                  {/* Target Selection Mode */}
                   <div className="mb-6">
                     <label className="block text-sm font-bold text-gray-700 mb-2">Destinatari</label>
-                    <div className="flex flex-col sm:flex-row gap-4 p-3 bg-gray-50 rounded border border-gray-200">
+                    <div className="flex gap-4 p-3 bg-gray-50 rounded border border-gray-200 mb-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
-                          name="target"
-                          defaultChecked={selectedStudentIds.size > 0}
-                          disabled={selectedStudentIds.size === 0}
+                          name="targetMode"
+                          checked={targetMode === 'manual'}
+                          onChange={() => setTargetMode('manual')}
                         />
-                        <span className={selectedStudentIds.size === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'}>
-                          Selezione Manuale ({selectedStudentIds.size})
+                        <span className="text-gray-700 font-medium">
+                          Selezione Manuale ({modalSelectedIds.size} selezionati)
                         </span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="target" defaultChecked={selectedStudentIds.size === 0} />
+                        <input
+                          type="radio"
+                          name="targetMode"
+                          checked={targetMode === 'course'}
+                          onChange={() => setTargetMode('course')}
+                        />
                         <span className="text-gray-700 font-medium">
-                          Classe / Corso Corrente ({filteredStudents.length})
+                          Per Corso
                         </span>
                       </label>
                     </div>
+
+                    {/* Selezione Manuale */}
+                    {targetMode === 'manual' && (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Search */}
+                        <div className="p-2 bg-gray-50 border-b">
+                          <input
+                            type="text"
+                            placeholder="Cerca studente..."
+                            value={studentSearch}
+                            onChange={(e) => setStudentSearch(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
+                          />
+                        </div>
+                        {/* Student List */}
+                        <div className="max-h-48 overflow-y-auto">
+                          {students
+                            .filter(s => s.email) // Solo studenti con email
+                            .filter(s =>
+                              studentSearch === '' ||
+                              `${s.first_name} ${s.last_name}`.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                              s.email?.toLowerCase().includes(studentSearch.toLowerCase())
+                            )
+                            .map(s => (
+                              <label
+                                key={s.id}
+                                className="flex items-center gap-3 p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={modalSelectedIds.has(s.id!)}
+                                  onChange={(e) => {
+                                    const newSet = new Set(modalSelectedIds);
+                                    if (e.target.checked) {
+                                      newSet.add(s.id!);
+                                    } else {
+                                      newSet.delete(s.id!);
+                                    }
+                                    setModalSelectedIds(newSet);
+                                  }}
+                                  className="w-4 h-4 text-indigo-600"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm text-gray-800 truncate">
+                                    {s.first_name} {s.last_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 truncate">{s.email}</div>
+                                </div>
+                                {s.enrolled_course && (
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                    {s.enrolled_course}
+                                  </span>
+                                )}
+                              </label>
+                            ))}
+                        </div>
+                        {/* Select All / Deselect All */}
+                        <div className="p-2 bg-gray-50 border-t flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = students.filter(s => s.email).map(s => s.id!);
+                              setModalSelectedIds(new Set(allIds));
+                            }}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                          >
+                            Seleziona tutti
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setModalSelectedIds(new Set())}
+                            className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                          >
+                            Deseleziona tutti
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selezione per Corso */}
+                    {targetMode === 'course' && (
+                      <div>
+                        <select
+                          value={selectedCourse}
+                          onChange={(e) => setSelectedCourse(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
+                        >
+                          <option value="">-- Seleziona un corso --</option>
+                          {COURSES_LIST.map(course => {
+                            const count = students.filter(s =>
+                              s.enrolled_course === course || s.course_1 === course
+                            ).length;
+                            return (
+                              <option key={course} value={course} disabled={count === 0}>
+                                {course} ({count} studenti)
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {selectedCourse && (
+                          <p className="mt-2 text-sm text-gray-600">
+                            <i className="fas fa-users mr-1"></i>
+                            {students.filter(s =>
+                              (s.enrolled_course === selectedCourse || s.course_1 === selectedCourse) && s.email
+                            ).length} studenti con email in questo corso
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Channel Selection */}
@@ -1109,6 +1247,10 @@ const StudentsView: React.FC = () => {
                       setEmailSubject('');
                       setMessageContent('');
                       setCommMessage(null);
+                      setModalSelectedIds(new Set());
+                      setTargetMode('manual');
+                      setSelectedCourse('');
+                      setStudentSearch('');
                     }}
                     className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
                   >
@@ -1122,7 +1264,13 @@ const StudentsView: React.FC = () => {
                     {sendingMessage ? (
                       <><i className="fas fa-spinner fa-spin"></i> Invio in corso...</>
                     ) : (
-                      <><i className="fas fa-paper-plane"></i> Invia {selectedStudentIds.size > 0 ? `a ${selectedStudentIds.size} destinatari` : 'alla lista filtrata'}</>
+                      <><i className="fas fa-paper-plane"></i> Invia a {
+                        targetMode === 'manual'
+                          ? `${modalSelectedIds.size} studente/i`
+                          : selectedCourse
+                            ? `${students.filter(s => (s.enrolled_course === selectedCourse || s.course_1 === selectedCourse) && s.email).length} studente/i`
+                            : '0 studenti'
+                      }</>
                     )}
                   </button>
                 </div>
