@@ -447,6 +447,26 @@ const StudentsView: React.FC = () => {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 
+        // Salva la notifica nel database per lo storico (gestionale)
+        const recipientNames = studentsWithToken.map(s => `${s.first_name} ${s.last_name}`);
+        await supabase.from('notifications').insert({
+          title: emailSubject || 'NAM - Nuova Audio Musicmedia',
+          body: messageContent,
+          sent_by: 'Gestionale',
+          recipients_count: studentsWithToken.length,
+          recipient_names: recipientNames,
+          is_read: false
+        });
+
+        // Salva una notifica per ogni studente (per la PWA)
+        const studentNotifications = studentsWithToken.map(s => ({
+          student_id: s.id,
+          title: emailSubject || 'NAM - Nuova Audio Musicmedia',
+          body: messageContent,
+          is_read: false
+        }));
+        await supabase.from('student_notifications').insert(studentNotifications);
+
         setCommMessage({
           type: 'success',
           text: `Push notification inviata a ${studentsWithToken.length} studente/i!`

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Role } from '../types';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
   role: Role;
@@ -46,7 +47,7 @@ const Header: React.FC<HeaderProps> = ({ role, onRoleChange, onToggleSidebar }) 
 
         <div className="flex items-center space-x-3 text-gray-500 border-l pl-4">
           <i className="fas fa-envelope hover:text-nam-blue cursor-pointer"></i>
-          <i className="fas fa-bell hover:text-nam-yellow cursor-pointer"></i>
+          <NotificationBell />
           <i className="fas fa-flag hover:text-nam-red cursor-pointer"></i>
         </div>
       </div>

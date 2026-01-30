@@ -203,6 +203,29 @@ PRODUCER & COMPOSER COMPLETO
 - [x] Istruzioni installazione per iOS (Condividi > Aggiungi a Home)
 - [x] Prompt mostrato nella schermata impostazione password
 
+### 24. Push Notifications (COMPLETATO)
+- [x] Edge Function `send-push` per invio via Firebase Cloud Messaging HTTP v1
+- [x] Salvataggio token FCM degli studenti nel database
+- [x] Invio notifiche push a singoli studenti o gruppi
+- [x] Notifiche ricevute su dispositivi Android e iOS
+
+### 25. Centro Notifiche Gestionale (COMPLETATO)
+- [x] Campanella nell'header con badge notifiche non lette
+- [x] Dropdown con storico notifiche inviate
+- [x] Possibilita' di segnare come lette singolarmente o tutte
+- [x] Tabella `notifications` per storico gestionale
+- [x] Aggiornamenti realtime via Supabase
+
+### 26. Centro Notifiche PWA Studenti (COMPLETATO)
+- [x] Campanella nell'header dell'app con badge animato
+- [x] Schermata notifiche con lista dinamica dal database
+- [x] Tabella `student_notifications` per notifiche personali
+- [x] Ogni studente vede solo le sue notifiche (RLS policy)
+- [x] Possibilita' di segnare come lette
+- [x] Possibilita' di eliminare notifiche (icona cestino)
+- [x] Sottoscrizione realtime per nuove notifiche
+- [x] Contatore notifiche non lette nella dashboard
+
 ---
 
 ## FUNZIONALITA' GESTIONALE COMPLETATE
@@ -242,7 +265,19 @@ PRODUCER & COMPOSER COMPLETO
 - [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
 - [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
 - [x] **Task 8 parziale** - WhatsApp Web integration base
+- [x] **Task 24** - Push Notifications via Firebase Cloud Messaging
+- [x] **Task 25** - Centro Notifiche Gestionale (campanella + dropdown)
+- [x] **Task 26** - Centro Notifiche PWA Studenti (campanella + lista + elimina)
 
 ---
 
-*Ultimo aggiornamento: 28 Gennaio 2026*
+## UTENTI GESTIONALE
+
+| Email | Ruolo | Note |
+|-------|-------|------|
+| claire@nam.it | Direzione | Admin principale |
+| irene@nam.it | Direzione | Aggiunto 30/01/2026 |
+
+---
+
+*Ultimo aggiornamento: 30 Gennaio 2026*
