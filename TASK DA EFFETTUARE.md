@@ -7,6 +7,8 @@
 ### 1. Validazione Dati Obbligatori Iscrizione (COMPLETATO)
 - [x] Non permettere alla Segreteria/cliente di procedere con l'iscrizione se mancano dati obbligatori
 - [x] Mostrare chiaramente quali campi sono mancanti
+- [x] **NUOVO**: Wizard a step sequenziali con validazione per ogni step
+- [x] **NUOVO**: Pulsanti navigazione colorati (Indietro rosso, Avanti verde, Annulla al centro)
 
 ### 2. Bug Email Invito (COMPLETATO)
 - [x] **VERIFICATO** - Configurato API plugin per sviluppo locale
@@ -16,14 +18,19 @@
 - [x] Creato pulsante **"Invia Invito"** con modal per reinvio email
 - [x] Permettere di rimandare inviti anche dopo la creazione dello studente
 
-### 4. Apertura Anagrafica Completa
-- [ ] Cliccando su uno studente deve aprirsi la sua anagrafica completa (non solo modifica)
-- [ ] Stesso comportamento per le lead nel CRM
-- [ ] Scheda anagrafica deve mostrare:
-  - Anagrafica completa
-  - Corsi a cui e' iscritto
-  - Pagamenti effettuati/pending
-  - Elenco esami
+### 4. Apertura Anagrafica Completa (COMPLETATO)
+- [x] Doppio click su studente apre popup anagrafica completa
+- [x] Scheda anagrafica mostra:
+  - [x] Anagrafica completa (CF, nascita, cittadinanza, etc.)
+  - [x] Contatti (email, telefoni)
+  - [x] Residenza completa
+  - [x] Stato iscrizione e corsi
+  - [x] Pagamenti (placeholder per futuro)
+  - [x] Esami (placeholder per futuro)
+  - [x] Info aggiuntive (responsabile, fonte, etc.)
+  - [x] Note
+- [x] Pulsante "Modifica Anagrafica" nel popup
+- [ ] Stesso comportamento per le lead nel CRM (da fare)
 
 ---
 
@@ -77,44 +84,45 @@ PRODUCER & COMPOSER COMPLETO
 #### Grado di Istruzione (COMPLETATO)
 - [x] Licenza Media, Diploma Superiore, Laurea Triennale, Laurea Magistrale, Master, Dottorato, Altro
 
-#### Sesso
-- [ ] Uomo
-- [ ] Donna
-- [ ] Preferisco non dichiarare
-- [ ] Altro
+#### Sesso (COMPLETATO)
+- [x] Maschio
+- [x] Femmina
+- [x] Altro
 
-#### Fonte Lead (Da dove arriva)
-- [ ] Form Sito → **automatizzare**
-- [ ] Mail → **automatizzare**
-- [ ] Whatsapp
-- [ ] Telefonata
-- [ ] Social DM
-- [ ] Fisicamente in sede
+#### Fonte Lead (COMPLETATO)
+- [x] Sito Web
+- [x] Passaparola
+- [x] Social Media
+- [x] Evento
+- [x] Altro
 
-#### Sede di Riferimento
-- [ ] Centrale
-- [ ] Bovisa
-- [ ] Online
+#### Sede di Riferimento (COMPLETATO)
+- [x] Centrale
+- [x] Bovisa
+- [x] Online
 
-#### Stato Iscrizione
-- [ ] Audizione Prenotata
-- [ ] Audizione avvenuta
-- [ ] Colloquio prenotato
-- [ ] Colloquio avvenuto
-- [ ] Test ingresso mandato
-- [ ] Test ingresso effettuato
-- [ ] Prenotato iscrizione
-- [ ] Non interessato
+#### Stato Iscrizione (COMPLETATO - AGGIORNATO)
+- [x] Primo contatto
+- [x] Colloquio
+- [x] Audizioni
+- [x] Test di ingresso
+- [x] Iscrizione
+- [x] Iscritto
+- [x] Scomparso
+- [x] Non interessato
 
-#### Campo NOTE
-- [ ] Aggiungere campo note libero per annotazioni della segreteria
+#### Campo NOTE (COMPLETATO)
+- [x] Campo note libero per annotazioni della segreteria
 
-### 7. Eventi al posto di Open Day
-- [ ] Sostituire "Open Day" con lista dinamica di **EVENTI**
-- [ ] Possibilita' di aggiungere:
-  - Open Day (con date specifiche)
-  - Workshop specifici
-  - Altri eventi personalizzabili
+#### Evento Acquisizione (NUOVO - COMPLETATO)
+- [x] Open Day (espandibile con altri eventi)
+
+#### Responsabile (NUOVO - COMPLETATO)
+- [x] Irene, Silvia, Claire, Simone
+
+### 7. Eventi al posto di Open Day (PARZIALE)
+- [x] Aggiunto campo "Evento Acquisizione" con Open Day
+- [ ] Possibilita' di aggiungere eventi dinamicamente
 
 ### 8. WhatsApp al posto di SMS (PARZIALE)
 - [x] Integrazione base WhatsApp Web (apre chat con messaggio precompilato)
@@ -245,6 +253,24 @@ PRODUCER & COMPOSER COMPLETO
 - [x] Risolto problema utenti "orfani" nel sistema di autenticazione
 - [x] Possibilita' di reinviare inviti alla stessa email dopo cancellazione
 
+### 27. Wizard Iscrizione a Step (NUOVO - COMPLETATO)
+- [x] Form iscrizione trasformato in wizard sequenziale a 4 step
+- [x] Validazione campi obbligatori per ogni step prima di procedere
+- [x] Progress bar visuale con step completati/corrente/futuri
+- [x] Pulsanti navigazione: Indietro (rosso), Annulla (grigio), Avanti (verde)
+- [x] Pulsante dinamico: "SALVA & INVITA" per nuovi, "SALVA MODIFICHE" per esistenti
+
+### 28. Pipeline Lista Studenti Migliorata (NUOVO - COMPLETATO)
+- [x] Nuove colonne: Nome, Email, Telefono, Stato, Data Creazione, 1° Corso, 2° Corso, Operazioni
+- [x] Badge colorati per ogni stato iscrizione
+- [x] Filtri: Cerca, Stato, Corso, Evento, Responsabile
+- [x] Doppio click per aprire anagrafica completa
+
+### 29. Calcolo Automatico Codice Fiscale (NUOVO - COMPLETATO)
+- [x] Libreria `codice-fiscale-js` integrata
+- [x] CF calcolato automaticamente da: nome, cognome, data nascita, genere, luogo, provincia
+- [x] Aggiornamento in tempo reale nel form
+
 ---
 
 ## NOTE PROCEDURA ISCRIZIONE IDEALE
@@ -257,10 +283,11 @@ PRODUCER & COMPOSER COMPLETO
 
 ## Completati
 
-- [x] **Task 1** - Validazione Dati Obbligatori Iscrizione (30 campi obbligatori)
+- [x] **Task 1** - Validazione Dati Obbligatori Iscrizione (30 campi obbligatori + wizard a step)
 - [x] **Task 2** - Bug Email Invito (API plugin configurato)
 - [x] **Task 3** - Azioni Invito Visibili (pulsante "Invia Invito" con modal)
-- [x] **Task 6 parziale** - Aggiunto campo "Come ci hai conosciuto?" e "Grado di Istruzione"
+- [x] **Task 4** - Apertura Anagrafica Completa (popup con doppio click)
+- [x] **Task 6** - Nuovi campi completati (Come ci hai conosciuto, Grado Istruzione, Sesso, Fonte Lead, Sede, Stato, Note, Evento, Responsabile)
 - [x] **Task 21** - Installazione PWA App Studenti (Android + iOS)
 - [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
 - [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
@@ -268,6 +295,18 @@ PRODUCER & COMPOSER COMPLETO
 - [x] **Task 24** - Push Notifications via Firebase Cloud Messaging
 - [x] **Task 25** - Centro Notifiche Gestionale (campanella + dropdown)
 - [x] **Task 26** - Centro Notifiche PWA Studenti (campanella + lista + elimina)
+- [x] **Task 27** - Wizard Iscrizione a Step sequenziali
+- [x] **Task 28** - Pipeline Lista Studenti Migliorata
+- [x] **Task 29** - Calcolo Automatico Codice Fiscale
+
+---
+
+## CAMPI DA AGGIUNGERE IN SUPABASE
+
+| Campo | Tipo | Descrizione |
+|-------|------|-------------|
+| `evento_acquisizione` | text | Evento tramite cui è arrivato (Open Day, etc.) |
+| `responsabile` | text | Operatore segreteria assegnato |
 
 ---
 
@@ -280,4 +319,4 @@ PRODUCER & COMPOSER COMPLETO
 
 ---
 
-*Ultimo aggiornamento: 30 Gennaio 2026*
+*Ultimo aggiornamento: 1 Febbraio 2026*
