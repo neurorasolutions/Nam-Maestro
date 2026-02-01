@@ -15,7 +15,8 @@ const StudentsView: React.FC = () => {
   const [filters, setFilters] = useState({
     search: '',
     course: '',
-    type: ''
+    type: '',
+    status: ''
   });
 
   // Stato iniziale vuoto per il form
@@ -233,8 +234,9 @@ const StudentsView: React.FC = () => {
 
     const matchesCourse = filters.course ? (student.course_1 === filters.course || student.course_2 === filters.course) : true;
     const matchesType = filters.type ? student.course_type === filters.type : true;
+    const matchesStatus = filters.status ? student.enrollment_status === filters.status : true;
 
-    return matchesSearch && matchesCourse && matchesType;
+    return matchesSearch && matchesCourse && matchesType && matchesStatus;
   });
 
   // --- LOGICA SELEZIONE ---
@@ -1008,7 +1010,7 @@ const StudentsView: React.FC = () => {
         </div>
 
         {/* Filtri */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cerca (Nome, Città, Email)</label>
             <div className="relative">
@@ -1023,7 +1025,18 @@ const StudentsView: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Filtra per Corso</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Stato</label>
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full p-2 border border-gray-400 rounded"
+            >
+              <option value="">Tutti gli Stati</option>
+              {LISTS.ENROLLMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Corso</label>
             <select
               value={filters.course}
               onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
@@ -1094,8 +1107,13 @@ const StudentsView: React.FC = () => {
                       <td className="p-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-bold whitespace-nowrap ${
                           student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' :
-                          student.enrollment_status === 'Prenotato' ? 'bg-blue-100 text-blue-700' :
-                          student.enrollment_status === 'In attesa' ? 'bg-yellow-100 text-yellow-700' :
+                          student.enrollment_status === 'Iscrizione' ? 'bg-emerald-100 text-emerald-700' :
+                          student.enrollment_status === 'Primo contatto' ? 'bg-blue-100 text-blue-700' :
+                          student.enrollment_status === 'Colloquio' ? 'bg-yellow-100 text-yellow-700' :
+                          student.enrollment_status === 'Audizioni' ? 'bg-orange-100 text-orange-700' :
+                          student.enrollment_status === 'Test di ingresso' ? 'bg-purple-100 text-purple-700' :
+                          student.enrollment_status === 'Scomparso' ? 'bg-gray-200 text-gray-500' :
+                          student.enrollment_status === 'Non interessato' ? 'bg-red-100 text-red-600' :
                           'bg-gray-100 text-gray-600'
                         }`}>
                           {student.enrollment_status || 'Da definire'}

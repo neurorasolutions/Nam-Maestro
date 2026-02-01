@@ -151,11 +151,14 @@ export const LISTS = {
   OPEN_DAY: ['Prenotato', 'Non Prenotato'],
 
   ENROLLMENT_STATUS: [
-    'Iscritto',
+    'Primo contatto',
     'Colloquio',
+    'Audizioni',
+    'Test di ingresso',
     'Iscrizione',
-    'Prenotato',
-    'Non interessato/a'
+    'Iscritto',
+    'Scomparso',
+    'Non interessato'
   ],
 
   // Marketing & Lead Sources (usate per "Come ci hai conosciuto" e "Da dove arriva il contatto")
