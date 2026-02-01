@@ -776,10 +776,6 @@ const StudentsView: React.FC = () => {
             <input type="checkbox" name="is_web_access_enabled" checked={formData.is_web_access_enabled} onChange={handleChange} className="rounded text-nam-red" />
             <span className="text-sm">Abilita Area Web</span>
           </label>
-          <label className="flex items-center space-x-2">
-            <input type="checkbox" name="is_moodle_access_enabled" checked={formData.is_moodle_access_enabled} onChange={handleChange} className="rounded text-nam-red" />
-            <span className="text-sm">Abilita Moodle</span>
-          </label>
         </div>
       </div>
 
@@ -834,6 +830,7 @@ const StudentsView: React.FC = () => {
           <label className="block text-xs font-bold text-gray-700 uppercase">Secondo Corso di Interesse *</label>
           <select name="course_2" value={formData.course_2} onChange={handleChangeWithValidation} className={getInputClass('course_2')}>
             <option value="">Seleziona...</option>
+            <option value="Nessuno">Nessuno</option>
             {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           {validationErrors.course_2 && <span className="text-xs text-red-500">{validationErrors.course_2}</span>}
