@@ -1672,21 +1672,38 @@ const StudentsView: React.FC = () => {
             <button
               type="button"
               onClick={handlePrevious}
-              className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+              className="flex items-center px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 font-bold shadow-md transition-all hover:shadow-lg"
             >
               <i className="fas fa-arrow-left mr-2"></i>
               Indietro
             </button>
           ) : (
-            <div /> // Spacer
+            <div className="w-32" /> // Spacer
           )}
+
+          {/* Pulsante Annulla al centro */}
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Sei sicuro di voler annullare? I dati non salvati andranno persi.')) {
+                setFormData(initialFormState);
+                setValidationErrors({});
+                setActiveTab(0);
+                setViewMode('list');
+              }
+            }}
+            className="flex items-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+          >
+            <i className="fas fa-times mr-2"></i>
+            Annulla Iscrizione
+          </button>
 
           {/* Pulsante Avanti o Salva */}
           {activeTab < 3 ? (
             <button
               type="button"
               onClick={handleNext}
-              className="flex items-center px-8 py-3 bg-nam-red text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition-all hover:shadow-xl"
+              className="flex items-center px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold shadow-md transition-all hover:shadow-lg"
             >
               Avanti
               <i className="fas fa-arrow-right ml-2"></i>
