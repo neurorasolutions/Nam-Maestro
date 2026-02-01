@@ -1048,11 +1048,11 @@ const StudentsView: React.FC = () => {
 
         {/* Tabella */}
         <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col">
-          <div className="overflow-y-auto flex-1">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto overflow-y-auto flex-1">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="p-4 border-b w-10 text-center">
+                  <th className="p-3 border-b w-10 text-center">
                     <input
                       type="checkbox"
                       checked={filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length}
@@ -1060,18 +1060,21 @@ const StudentsView: React.FC = () => {
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
                     />
                   </th>
-                  <th className="p-4 border-b font-bold text-gray-600 text-sm">Allievo</th>
-                  <th className="p-4 border-b font-bold text-gray-600 text-sm">Corso & Tipo</th>
-                  <th className="p-4 border-b font-bold text-gray-600 text-sm hidden md:table-cell">Stato & Città</th>
-                  <th className="p-4 border-b font-bold text-gray-600 text-sm text-center">Notifiche</th>
-                  <th className="p-4 border-b font-bold text-gray-600 text-sm text-right">Azioni</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">Nome e Cognome</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">Email</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">Telefono</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">Stato</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">Data Creazione</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">1° Corso</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm">2° Corso</th>
+                  <th className="p-3 border-b font-bold text-gray-600 text-sm text-center">Operazioni</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
                     <tr key={student.id} className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${selectedStudentIds.has(student.id!) ? 'bg-indigo-50' : ''}`}>
-                      <td className="p-4 text-center">
+                      <td className="p-3 text-center">
                         <input
                           type="checkbox"
                           checked={selectedStudentIds.has(student.id!)}
@@ -1079,67 +1082,63 @@ const StudentsView: React.FC = () => {
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer w-4 h-4"
                         />
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mr-3 flex-shrink-0">
-                            {student.avatar_url ? (
-                              <img src={student.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="font-bold text-gray-500">{student.first_name[0]}</span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-800">{student.first_name} {student.last_name}</div>
-                            <div className="text-xs text-gray-500">{student.email}</div>
-                          </div>
-                        </div>
+                      <td className="p-3">
+                        <div className="font-semibold text-gray-800">{student.first_name} {student.last_name}</div>
                       </td>
-                      <td className="p-4">
-                        <div className="text-sm font-semibold text-nam-blue">{student.course_1 || 'Nessun corso'}</div>
-                        <div className="text-xs text-gray-500 bg-gray-100 inline-block px-1 rounded">
-                          {student.course_type || 'N/A'}
-                        </div>
+                      <td className="p-3">
+                        <div className="text-sm text-gray-600">{student.email || '-'}</div>
                       </td>
-                      <td className="p-4 hidden md:table-cell">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' :
+                      <td className="p-3">
+                        <div className="text-sm text-gray-600">{student.mobile_phone || student.phone || '-'}</div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold whitespace-nowrap ${
+                          student.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' :
                           student.enrollment_status === 'Prenotato' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
+                          student.enrollment_status === 'In attesa' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
                           {student.enrollment_status || 'Da definire'}
                         </span>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {student.city ? <><i className="fas fa-map-marker-alt mr-1"></i>{student.city}</> : '-'}
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm text-gray-600">
+                          {student.created_at ? new Date(student.created_at).toLocaleDateString('it-IT') : '-'}
                         </div>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-3">
+                        <div className="text-sm text-nam-blue font-medium">{student.course_1 || '-'}</div>
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm text-gray-600">
+                          {student.course_2 ? student.course_2 : 'Nessuno'}
+                        </div>
+                      </td>
+                      <td className="p-3 text-center">
                         <div className="flex justify-center space-x-2">
-                          <button className="text-gray-300 hover:text-nam-blue" title="Invia Notifica Push (Presto disponibile)">
-                            <i className="fas fa-bell"></i>
+                          <button
+                            onClick={() => handleEdit(student)}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm font-medium transition-colors"
+                            title="Modifica"
+                          >
+                            <i className="fas fa-edit mr-1"></i>
+                            Modifica
                           </button>
-                          <button className="text-gray-300 hover:text-nam-blue" title="Invia Email (Presto disponibile)">
-                            <i className="fas fa-envelope"></i>
+                          <button
+                            onClick={() => student.id && handleDelete(student.id)}
+                            className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm font-medium transition-colors"
+                            title="Elimina"
+                          >
+                            <i className="fas fa-trash mr-1"></i>
+                            Elimina
                           </button>
                         </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleEdit(student)}
-                          className="text-blue-600 hover:text-blue-800 mr-3 text-sm font-semibold"
-                        >
-                          Modifica
-                        </button>
-                        <button
-                          onClick={() => student.id && handleDelete(student.id)}
-                          className="text-red-500 hover:text-red-700 text-sm font-semibold"
-                        >
-                          Elimina
-                        </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-10 text-center text-gray-500">
+                    <td colSpan={9} className="p-10 text-center text-gray-500">
                       Nessun allievo trovato con questi filtri.
                     </td>
                   </tr>
