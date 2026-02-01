@@ -1762,7 +1762,7 @@ const StudentsView: React.FC = () => {
               ) : (
                 <>
                   <i className="fas fa-save mr-2"></i>
-                  SALVA & INVITA
+                  {formData.id ? 'SALVA MODIFICHE' : 'SALVA & INVITA'}
                 </>
               )}
             </button>
