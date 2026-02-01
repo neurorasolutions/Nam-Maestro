@@ -100,6 +100,66 @@ const StudentsView: React.FC = () => {
     return 0;
   };
 
+  // --- WIZARD: Validazione step corrente ---
+  const validateCurrentStep = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Campi obbligatori per lo step corrente
+    const stepFields = REQUIRED_FIELDS.filter(f => f.tab === activeTab);
+
+    stepFields.forEach(({ field, label }) => {
+      const value = formData[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        errors[field] = `${label} è obbligatorio`;
+      }
+    });
+
+    // Validazione email (solo se siamo nel tab 1)
+    if (activeTab === 1 && formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors['email'] = 'Formato email non valido';
+    }
+
+    // Privacy consent (solo se siamo nel tab 3)
+    if (activeTab === 3 && !formData.privacy_consent) {
+      errors['privacy_consent'] = 'Il Consenso Privacy è obbligatorio';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // --- WIZARD: Navigazione step ---
+  const handleNext = () => {
+    if (validateCurrentStep()) {
+      setActiveTab(prev => Math.min(prev + 1, 3));
+      setValidationErrors({}); // Reset errori per il nuovo step
+    }
+  };
+
+  const handlePrevious = () => {
+    setActiveTab(prev => Math.max(prev - 1, 0));
+    setValidationErrors({}); // Reset errori
+  };
+
+  // Controlla se uno step è stato completato (tutti i campi obbligatori compilati)
+  const isStepCompleted = (stepIndex: number): boolean => {
+    const stepFields = REQUIRED_FIELDS.filter(f => f.tab === stepIndex);
+
+    for (const { field } of stepFields) {
+      const value = formData[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        return false;
+      }
+    }
+
+    // Per il tab 3, controlla anche privacy_consent
+    if (stepIndex === 3 && !formData.privacy_consent) {
+      return false;
+    }
+
+    return true;
+  };
+
   // --- STATO MESSAGGISTICA ---
   const [showCommModal, setShowCommModal] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
@@ -1472,18 +1532,10 @@ const StudentsView: React.FC = () => {
               {formData.id ? 'Modifica Studente' : 'Nuova Iscrizione'}
             </h1>
             <p className="text-xs text-gray-500">
-              {formData.id ? `ID: ${formData.id}` : 'Compila la scheda per iscrivere un nuovo allievo'}
+              {formData.id ? `ID: ${formData.id}` : 'Compila tutti gli step per completare l\'iscrizione'}
             </p>
           </div>
         </div>
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-bold flex items-center"
-        >
-          {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
-          {loading ? 'Attendere...' : 'SALVA & INVITA'}
-        </button>
       </div>
 
       {message && (
@@ -1507,20 +1559,54 @@ const StudentsView: React.FC = () => {
         </div>
       )}
 
-      {/* Tabs Header */}
-      <div className="flex border-b mb-6 overflow-x-auto">
-        {['Anagrafica', 'Contatti & Residenza', 'Didattica & Corsi', 'Amministrazione'].map((tab, idx) => (
-          <button
-            key={idx}
-            onClick={() => setActiveTab(idx)}
-            className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === idx
-              ? 'border-nam-red text-nam-red font-bold bg-red-50'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-          >
-            {idx + 1}. {tab}
-          </button>
-        ))}
+      {/* Wizard Step Indicator */}
+      <div className="mb-6">
+        {/* Progress Bar */}
+        <div className="flex items-center justify-between mb-4">
+          {['Anagrafica', 'Contatti & Residenza', 'Didattica & Corsi', 'Amministrazione'].map((tab, idx) => (
+            <div key={idx} className="flex items-center flex-1">
+              {/* Step Circle */}
+              <div className="flex flex-col items-center">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
+                    isStepCompleted(idx) && idx < activeTab
+                      ? 'bg-green-500 text-white' // Completato
+                      : activeTab === idx
+                      ? 'bg-nam-red text-white ring-4 ring-red-200' // Corrente
+                      : 'bg-gray-200 text-gray-500' // Futuro
+                  }`}
+                >
+                  {isStepCompleted(idx) && idx < activeTab ? (
+                    <i className="fas fa-check"></i>
+                  ) : (
+                    idx + 1
+                  )}
+                </div>
+                <span
+                  className={`text-xs mt-2 text-center max-w-[100px] ${
+                    activeTab === idx ? 'text-nam-red font-bold' : 'text-gray-500'
+                  }`}
+                >
+                  {tab}
+                </span>
+              </div>
+              {/* Connector Line */}
+              {idx < 3 && (
+                <div
+                  className={`flex-1 h-1 mx-2 rounded ${
+                    isStepCompleted(idx) && idx < activeTab ? 'bg-green-500' : 'bg-gray-200'
+                  }`}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        {/* Step Label */}
+        <div className="text-center text-sm text-gray-600 bg-gray-50 rounded py-2">
+          <span className="font-bold text-nam-red">Step {activeTab + 1} di 4</span>
+          <span className="mx-2">•</span>
+          <span>{['Anagrafica', 'Contatti & Residenza', 'Didattica & Corsi', 'Amministrazione'][activeTab]}</span>
+        </div>
       </div>
 
       {/* Form Content */}
@@ -1529,6 +1615,54 @@ const StudentsView: React.FC = () => {
         {activeTab === 1 && renderTab2_Contatti()}
         {activeTab === 2 && renderTab3_Didattica()}
         {activeTab === 3 && renderTab4_Admin()}
+
+        {/* Wizard Navigation Buttons */}
+        <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+          {/* Pulsante Indietro */}
+          {activeTab > 0 ? (
+            <button
+              type="button"
+              onClick={handlePrevious}
+              className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+            >
+              <i className="fas fa-arrow-left mr-2"></i>
+              Indietro
+            </button>
+          ) : (
+            <div /> // Spacer
+          )}
+
+          {/* Pulsante Avanti o Salva */}
+          {activeTab < 3 ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="flex items-center px-8 py-3 bg-nam-red text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition-all hover:shadow-xl"
+            >
+              Avanti
+              <i className="fas fa-arrow-right ml-2"></i>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex items-center px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold shadow-lg transition-all hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  Attendere...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-save mr-2"></i>
+                  SALVA & INVITA
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );
