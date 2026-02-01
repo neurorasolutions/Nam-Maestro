@@ -760,7 +760,7 @@ const StudentsView: React.FC = () => {
         <h3 className="font-bold text-nam-blue border-b pb-1">Recapiti</h3>
         <div>
           <label className="block text-xs font-bold text-gray-700 uppercase">Email *</label>
-          <input type="email" name="email" value={formData.email} onChange={handleChangeWithValidation} className={getInputClass('email', 'w-full p-2 border rounded bg-yellow-50')} />
+          <input type="email" name="email" value={formData.email} onChange={handleChangeWithValidation} className={getInputClass('email')} />
           {validationErrors.email && <span className="text-xs text-red-500">{validationErrors.email}</span>}
         </div>
         <div className="grid grid-cols-2 gap-4">
