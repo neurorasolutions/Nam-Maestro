@@ -177,6 +177,10 @@ const StudentsView: React.FC = () => {
   const [modalSelectedIds, setModalSelectedIds] = useState<Set<string>>(new Set());
   const [studentSearch, setStudentSearch] = useState('');
 
+  // --- STATO MODAL ANAGRAFICA ---
+  const [showAnagraficaModal, setShowAnagraficaModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
   // --- STATO MODAL INVITO ---
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteStudentId, setInviteStudentId] = useState<string>('');
@@ -1160,7 +1164,15 @@ const StudentsView: React.FC = () => {
               <tbody>
                 {filteredStudents.length > 0 ? (
                   filteredStudents.map((student) => (
-                    <tr key={student.id} className={`hover:bg-gray-50 border-b last:border-0 transition-colors ${selectedStudentIds.has(student.id!) ? 'bg-indigo-50' : ''}`}>
+                    <tr
+                      key={student.id}
+                      className={`hover:bg-gray-50 border-b last:border-0 transition-colors cursor-pointer ${selectedStudentIds.has(student.id!) ? 'bg-indigo-50' : ''}`}
+                      onDoubleClick={() => {
+                        setSelectedStudent(student);
+                        setShowAnagraficaModal(true);
+                      }}
+                      title="Doppio click per aprire scheda completa"
+                    >
                       <td className="p-3 text-center">
                         <input
                           type="checkbox"
@@ -1595,6 +1607,253 @@ const StudentsView: React.FC = () => {
                       <i className="fas fa-paper-plane"></i> Invia Invito
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ANAGRAFICA MODAL */}
+        {showAnagraficaModal && selectedStudent && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+              {/* Header */}
+              <div className="bg-nam-blue p-4 flex justify-between items-center text-white flex-shrink-0">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                    {selectedStudent.avatar_url ? (
+                      <img src={selectedStudent.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-bold text-2xl">{selectedStudent.first_name?.[0]}{selectedStudent.last_name?.[0]}</span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xl">{selectedStudent.first_name} {selectedStudent.last_name}</h3>
+                    <p className="text-white/80 text-sm">{selectedStudent.email}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAnagraficaModal(false)} className="hover:bg-white/20 p-2 rounded transition-colors">
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Colonna Sinistra - Dati Personali */}
+                  <div className="space-y-6">
+                    {/* Anagrafica */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-user mr-2"></i> Dati Anagrafici
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Codice Fiscale:</span>
+                          <span className="font-medium">{selectedStudent.fiscal_code || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Data di Nascita:</span>
+                          <span className="font-medium">{selectedStudent.date_of_birth ? new Date(selectedStudent.date_of_birth).toLocaleDateString('it-IT') : '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Luogo di Nascita:</span>
+                          <span className="font-medium">{selectedStudent.birth_place || '-'} ({selectedStudent.birth_province || '-'})</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Genere:</span>
+                          <span className="font-medium">{selectedStudent.gender || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Cittadinanza:</span>
+                          <span className="font-medium">{selectedStudent.citizenship || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Titolo di Studio:</span>
+                          <span className="font-medium">{selectedStudent.education_level || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contatti */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-phone mr-2"></i> Contatti
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Email:</span>
+                          <span className="font-medium">{selectedStudent.email || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Cellulare:</span>
+                          <span className="font-medium">{selectedStudent.mobile_phone || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Telefono:</span>
+                          <span className="font-medium">{selectedStudent.phone || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Residenza */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-home mr-2"></i> Residenza
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Indirizzo:</span>
+                          <span className="font-medium">{selectedStudent.address || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Città:</span>
+                          <span className="font-medium">{selectedStudent.city || '-'} ({selectedStudent.province || '-'})</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">CAP:</span>
+                          <span className="font-medium">{selectedStudent.zip_code || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Paese:</span>
+                          <span className="font-medium">{selectedStudent.country || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Colonna Destra - Corsi e Pagamenti */}
+                  <div className="space-y-6">
+                    {/* Stato Iscrizione */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-graduation-cap mr-2"></i> Iscrizione & Corsi
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 text-sm">Stato:</span>
+                          <span className={`text-xs px-3 py-1 rounded-full font-bold ${
+                            selectedStudent.enrollment_status === 'Iscritto' ? 'bg-green-100 text-green-700' :
+                            selectedStudent.enrollment_status === 'Iscrizione' ? 'bg-emerald-100 text-emerald-700' :
+                            selectedStudent.enrollment_status === 'Primo contatto' ? 'bg-blue-100 text-blue-700' :
+                            selectedStudent.enrollment_status === 'Colloquio' ? 'bg-yellow-100 text-yellow-700' :
+                            selectedStudent.enrollment_status === 'Audizioni' ? 'bg-orange-100 text-orange-700' :
+                            selectedStudent.enrollment_status === 'Test di ingresso' ? 'bg-purple-100 text-purple-700' :
+                            selectedStudent.enrollment_status === 'Scomparso' ? 'bg-gray-200 text-gray-500' :
+                            selectedStudent.enrollment_status === 'Non interessato' ? 'bg-red-100 text-red-600' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {selectedStudent.enrollment_status || 'Da definire'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Corso Iscritto:</span>
+                          <span className="font-bold text-nam-red">{selectedStudent.enrolled_course || '-'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">1° Interesse:</span>
+                          <span className="font-medium">{selectedStudent.course_1 || '-'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">2° Interesse:</span>
+                          <span className="font-medium">{selectedStudent.course_2 || 'Nessuno'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Tipologia:</span>
+                          <span className="font-medium">{selectedStudent.course_type || '-'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Sede:</span>
+                          <span className="font-medium">{selectedStudent.location || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pagamenti */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-credit-card mr-2"></i> Pagamenti
+                      </h4>
+                      <div className="text-center py-4 text-gray-400">
+                        <i className="fas fa-file-invoice-dollar text-3xl mb-2"></i>
+                        <p className="text-sm">Nessun pagamento registrato</p>
+                        <p className="text-xs">(Funzionalità in arrivo)</p>
+                      </div>
+                    </div>
+
+                    {/* Esami */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-clipboard-list mr-2"></i> Esami
+                      </h4>
+                      <div className="text-center py-4 text-gray-400">
+                        <i className="fas fa-award text-3xl mb-2"></i>
+                        <p className="text-sm">Nessun esame registrato</p>
+                        <p className="text-xs">(Funzionalità in arrivo)</p>
+                      </div>
+                    </div>
+
+                    {/* Info Aggiuntive */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-bold text-nam-blue mb-3 flex items-center">
+                        <i className="fas fa-info-circle mr-2"></i> Info Aggiuntive
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Responsabile:</span>
+                          <span className="font-medium">{selectedStudent.responsabile || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Evento Acquisizione:</span>
+                          <span className="font-medium">{selectedStudent.evento_acquisizione || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Fonte Lead:</span>
+                          <span className="font-medium">{selectedStudent.lead_source || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Data Iscrizione:</span>
+                          <span className="font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('it-IT') : '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Privacy:</span>
+                          <span className={`font-medium ${selectedStudent.privacy_consent ? 'text-green-600' : 'text-red-600'}`}>
+                            {selectedStudent.privacy_consent ? 'Accettata' : 'Non accettata'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Note */}
+                {selectedStudent.notes && (
+                  <div className="mt-6 bg-yellow-50 rounded-lg p-4">
+                    <h4 className="font-bold text-yellow-700 mb-2 flex items-center">
+                      <i className="fas fa-sticky-note mr-2"></i> Note
+                    </h4>
+                    <p className="text-sm text-gray-700">{selectedStudent.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-gray-50 p-4 flex justify-between items-center border-t flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setShowAnagraficaModal(false);
+                    handleEdit(selectedStudent);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium transition-colors flex items-center"
+                >
+                  <i className="fas fa-edit mr-2"></i>
+                  Modifica Anagrafica
+                </button>
+                <button
+                  onClick={() => setShowAnagraficaModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                >
+                  Chiudi
                 </button>
               </div>
             </div>
