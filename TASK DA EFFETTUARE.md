@@ -283,20 +283,27 @@ PRODUCER & COMPOSER COMPLETO
 
 ## Completati
 
-- [x] **Task 1** - Validazione Dati Obbligatori Iscrizione (30 campi obbligatori + wizard a step)
-- [x] **Task 2** - Bug Email Invito (API plugin configurato)
-- [x] **Task 3** - Azioni Invito Visibili (pulsante "Invia Invito" con modal)
+### 1 Febbraio 2026
 - [x] **Task 4** - Apertura Anagrafica Completa (popup con doppio click)
-- [x] **Task 6** - Nuovi campi completati (Come ci hai conosciuto, Grado Istruzione, Sesso, Fonte Lead, Sede, Stato, Note, Evento, Responsabile)
-- [x] **Task 21** - Installazione PWA App Studenti (Android + iOS)
-- [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
-- [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
-- [x] **Task 8 parziale** - WhatsApp Web integration base
+- [x] **Task 6** - Nuovi campi: Stati iscrizione aggiornati, Evento Acquisizione, Responsabile
+- [x] **Task 27** - Wizard Iscrizione a Step sequenziali (validazione per step, pulsanti colorati)
+- [x] **Task 28** - Pipeline Lista Studenti Migliorata (nuove colonne, filtri, badge colorati)
+- [x] **Task 29** - Calcolo Automatico Codice Fiscale (libreria codice-fiscale-js)
+
+### 30 Gennaio 2026
 - [x] **Task 24** - Push Notifications via Firebase Cloud Messaging
 - [x] **Task 25** - Centro Notifiche Gestionale (campanella + dropdown)
 - [x] **Task 26** - Centro Notifiche PWA Studenti (campanella + lista + elimina)
-- [x] **Task 27** - Wizard Iscrizione a Step sequenziali
-- [x] **Task 28** - Pipeline Lista Studenti Migliorata
+
+### 26 Gennaio 2026
+- [x] **Task 1** - Validazione Dati Obbligatori Iscrizione (30 campi obbligatori)
+- [x] **Task 2** - Bug Email Invito (API plugin configurato)
+- [x] **Task 3** - Azioni Invito Visibili (pulsante "Invia Invito" con modal)
+- [x] **Task 6 parziale** - Campi: Come ci hai conosciuto, Grado Istruzione
+- [x] **Task 8 parziale** - WhatsApp Web integration base
+- [x] **Task 21** - Installazione PWA App Studenti (Android + iOS)
+- [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
+- [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
 - [x] **Task 29** - Calcolo Automatico Codice Fiscale
 
 ---
