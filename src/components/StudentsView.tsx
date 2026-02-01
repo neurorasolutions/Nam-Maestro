@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { LISTS, COURSES_LIST } from '../constants';
 import { Student } from '../types';
+import CodiceFiscale from 'codice-fiscale-js';
 
 const StudentsView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
@@ -224,6 +225,44 @@ const StudentsView: React.FC = () => {
       fetchStudents();
     }
   }, [viewMode]);
+
+  // Calcolo automatico Codice Fiscale
+  useEffect(() => {
+    // Calcola solo se siamo nel form e abbiamo tutti i dati necessari
+    if (viewMode !== 'form') return;
+
+    const { first_name, last_name, date_of_birth, gender, birth_place, birth_province } = formData;
+
+    // Verifica che tutti i campi necessari siano compilati
+    if (!first_name || !last_name || !date_of_birth || !gender || !birth_place) return;
+
+    try {
+      // Mappa il genere al formato richiesto dalla libreria
+      const genderCode = gender === 'Maschio' || gender === 'M' ? 'M' : 'F';
+
+      // Parsing della data
+      const [year, month, day] = date_of_birth.split('-').map(Number);
+
+      const cf = new CodiceFiscale({
+        name: first_name,
+        surname: last_name,
+        gender: genderCode,
+        day: day,
+        month: month,
+        year: year,
+        birthplace: birth_place,
+        birthplaceProvincia: birth_province || ''
+      });
+
+      // Aggiorna solo se il CF è diverso da quello attuale
+      if (cf.code && cf.code !== formData.fiscal_code) {
+        setFormData(prev => ({ ...prev, fiscal_code: cf.code }));
+      }
+    } catch (error) {
+      // Se il calcolo fallisce (es. comune non trovato), non fare nulla
+      console.log('Calcolo CF non riuscito:', error);
+    }
+  }, [formData.first_name, formData.last_name, formData.date_of_birth, formData.gender, formData.birth_place, formData.birth_province, viewMode]);
 
   // --- LOGICA FILTRI ---
   const filteredStudents = students.filter(student => {

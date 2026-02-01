@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.91.1",
+    "codice-fiscale-js": "^2.3.23",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
