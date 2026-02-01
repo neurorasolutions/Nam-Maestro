@@ -197,48 +197,68 @@ const DidacticsView: React.FC = () => {
                         {isExpanded && (
                            <div className="border-t border-gray-200 bg-gray-50 p-4">
                               {hasSubcategories ? (
-                                 // Sottocategorie (es. Strumenti)
-                                 <div className="space-y-2">
+                                 // Sottocategorie (es. Strumenti) - LAYOUT ORIZZONTALE
+                                 <div>
+                                    {/* Pulsanti sottocategorie in orizzontale */}
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                       {Object.keys(config.sottocategorie).map((sottoCat) => {
+                                          const isSubExpanded = expandedSubcategories.has(`${categoria}-${sottoCat}`);
+                                          const corsi = config.sottocategorie[sottoCat];
+                                          return (
+                                             <button
+                                                key={sottoCat}
+                                                onClick={() => toggleSubcategory(`${categoria}-${sottoCat}`)}
+                                                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isSubExpanded
+                                                      ? 'bg-gray-700 text-white border-2 border-gray-700'
+                                                      : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-gray-400'
+                                                   }`}
+                                             >
+                                                {sottoCat}
+                                                <span className={`ml-2 text-xs ${isSubExpanded ? 'text-gray-300' : 'text-gray-400'}`}>
+                                                   ({corsi.length})
+                                                </span>
+                                             </button>
+                                          );
+                                       })}
+                                    </div>
+
+                                    {/* Livelli della sottocategoria selezionata - GRIGLIA ORIZZONTALE */}
                                     {Object.entries(config.sottocategorie).map(([sottoCat, corsi]) => {
                                        const isSubExpanded = expandedSubcategories.has(`${categoria}-${sottoCat}`);
+                                       if (!isSubExpanded) return null;
+
                                        return (
-                                          <div key={sottoCat} className="bg-white rounded-lg border border-gray-200">
-                                             <button
-                                                onClick={() => toggleSubcategory(`${categoria}-${sottoCat}`)}
-                                                className="w-full p-3 flex items-center justify-between hover:bg-gray-50"
-                                             >
-                                                <span className="font-semibold text-gray-700">{sottoCat}</span>
-                                                <div className="flex items-center gap-2">
-                                                   <span className="text-xs text-gray-500">{corsi.length} livelli</span>
-                                                   <i className={`fas fa-chevron-down text-gray-400 text-sm transition-transform ${isSubExpanded ? 'rotate-180' : ''}`}></i>
-                                                </div>
-                                             </button>
-                                             {isSubExpanded && (
-                                                <div className="border-t border-gray-100 p-3 space-y-2">
-                                                   {corsi.map((corso) => {
-                                                      const studentiCorso = getStudentsForCourse(categoria, corso, sottoCat);
-                                                      return (
-                                                         <div key={corso} className="bg-gray-50 rounded p-3">
-                                                            <div className="flex items-center justify-between mb-2">
-                                                               <span className="text-sm font-medium text-gray-700">{sottoCat} {corso}</span>
-                                                               <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                                                                  {studentiCorso.length} iscritti
-                                                               </span>
-                                                            </div>
-                                                            {studentiCorso.length > 0 && (
-                                                               <div className="flex flex-wrap gap-1 mt-2">
-                                                                  {studentiCorso.map(s => (
-                                                                     <span key={s.id} className="text-xs bg-white border border-gray-200 px-2 py-1 rounded">
-                                                                        {s.first_name} {s.last_name}
-                                                                     </span>
-                                                                  ))}
-                                                               </div>
-                                                            )}
+                                          <div key={sottoCat} className="bg-gray-50 rounded-lg p-4">
+                                             <h4 className="font-semibold text-gray-700 mb-3">{sottoCat}</h4>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                                {corsi.map((corso) => {
+                                                   const studentiCorso = getStudentsForCourse(categoria, corso, sottoCat);
+                                                   return (
+                                                      <div key={corso} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                                                         <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-medium text-gray-700">{corso}</span>
+                                                            <span className={`text-xs px-2 py-1 rounded ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                               {studentiCorso.length}
+                                                            </span>
                                                          </div>
-                                                      );
-                                                   })}
-                                                </div>
-                                             )}
+                                                         {studentiCorso.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                               {studentiCorso.slice(0, 3).map(s => (
+                                                                  <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                                                     {s.first_name} {s.last_name?.[0]}.
+                                                                  </span>
+                                                               ))}
+                                                               {studentiCorso.length > 3 && (
+                                                                  <span className="text-xs text-gray-500 px-2 py-1">
+                                                                     +{studentiCorso.length - 3}
+                                                                  </span>
+                                                               )}
+                                                            </div>
+                                                         )}
+                                                      </div>
+                                                   );
+                                                })}
+                                             </div>
                                           </div>
                                        );
                                     })}

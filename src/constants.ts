@@ -56,16 +56,16 @@ export const CORSI_STRUTTURA = {
   'CANTO': {
     icon: 'fa-microphone',
     color: 'bg-pink-500',
-    corsi: ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3']
+    corsi: ['Propedeutico', 'Base/Intermedio', 'Avanzato', '1 Pro', '2 Pro', '3 Pro']
   },
   'STRUMENTO': {
     icon: 'fa-guitar',
     color: 'bg-amber-500',
     sottocategorie: {
-      'Chitarra': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
-      'Basso': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
-      'Pianoforte': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2'],
-      'Batteria': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
+      'Chitarra': ['Propedeutico', 'Base/Intermedio', 'Avanzato', '1 Pro', '2 Pro', '3 Pro'],
+      'Basso': ['Propedeutico', 'Base/Intermedio', 'Avanzato', '1 Pro', '2 Pro', '3 Pro'],
+      'Pianoforte': ['Propedeutico', 'Base/Intermedio', 'Avanzato', '1 Pro', '2 Pro'],
+      'Batteria': ['Propedeutico', 'Base/Intermedio', 'Avanzato', '1 Pro', '2 Pro', '3 Pro'],
       'Batteria Maxxima': ['Anno 1', 'Anno 2', 'Anno 3', 'Quarto Anno'],
       'Sax': ['Base', 'Intermedio']
     }
@@ -75,10 +75,15 @@ export const CORSI_STRUTTURA = {
     color: 'bg-purple-500',
     corsi: ['Kids', 'Breve', 'Pro']
   },
+  'MUSIC BUSINESS': {
+    icon: 'fa-briefcase',
+    color: 'bg-gray-500',
+    corsi: ['Breve', 'Full']
+  },
   'FONICO': {
     icon: 'fa-sliders-h',
     color: 'bg-blue-500',
-    corsi: ['Anno Unico', 'Anno Unico Full', 'Biennio Anno 1', 'Biennio Anno 2', 'Super Full']
+    corsi: ['Fonico Full', 'Fonico Superfull', 'Biennio Anno 1', 'Biennio Anno 2']
   },
   'SOUND DESIGN': {
     icon: 'fa-wave-square',
@@ -93,17 +98,17 @@ export const CORSI_STRUTTURA = {
   'PRODUCER & COMPOSER': {
     icon: 'fa-music',
     color: 'bg-green-500',
-    corsi: ['Anno Unico', 'Biennio Anno 1', 'Biennio Anno 2', 'Full']
+    corsi: ['Anno Unico', 'Biennio']
+  },
+  'PRODUCER & COMPOSER COMPLETO': {
+    icon: 'fa-layer-group',
+    color: 'bg-emerald-600',
+    corsi: ['Anno Unico', 'Biennio']
   },
   'EMP PRO': {
     icon: 'fa-star',
     color: 'bg-yellow-500',
     corsi: ['EMP Pro 1', 'EMP Pro 2', 'EMP Pro 3']
-  },
-  'MUSIC BUSINESS': {
-    icon: 'fa-briefcase',
-    color: 'bg-gray-500',
-    corsi: ['Base', 'Avanzato']
   },
   'GIOVANISSIMI': {
     icon: 'fa-child',
@@ -112,30 +117,56 @@ export const CORSI_STRUTTURA = {
   }
 };
 
-// --- LISTA CORSI LEGACY (per compatibilità dropdown esistenti) ---
-export const COURSES_LIST = [
-  "Basso Avanzato Anno 1", "Basso Base Anno 1", "Basso Intermedio Anno 1", "Basso Pro Anno 1",
-  "Basso Pro Anno 2", "Basso Pro Anno 3",
-  "Batteria Avanzato Anno 1", "Batteria Base Anno 1", "Batteria Intermedio Anno 1",
-  "Batteria Maxxima Anno 1", "Batteria Maxxima Anno 2", "Batteria Maxxima Anno 3",
-  "Batteria Maxxima Quarto Anno Anno 1", "Batteria Mini Pro Anno 1", "Batteria Mini Pro Anno 2",
-  "Batteria Mini Pro Anno 3", "Batteria Pro Anno 1", "Batteria Pro Anno 2",
-  "Canto Avanzato Anno 1", "Canto Base Anno 1", "Canto Intermedio Anno 1", "Canto Pro Anno 1",
-  "Canto Pro Anno 2", "Canto Pro Anno 3",
-  "Chitarra Avanzato Anno 1", "Chitarra Base Anno 1", "Chitarra Intermedio Anno 1",
-  "Chitarra Pro Anno 1", "Chitarra Pro Anno 2", "Chitarra Pro Anno 3",
-  "DJ Pro Anno 1", "EMP PRO Anno 1",
-  "Fonico Anno Unico Anno 1", "Fonico Anno Unico Full Anno 1", "Fonico Biennio Anno 1", "Fonico Biennio Anno 2",
-  "GIOVANISSIMI basso Anno 1", "GIOVANISSIMI batteria Anno 1", "GIOVANISSIMI canto Anno 1",
-  "GIOVANISSIMI chitarra Anno 1", "GIOVANISSIMI pianoforte Anno 1",
-  "Pianoforte Avanzato Anno 1", "Pianoforte Base Anno 1", "Pianoforte Intermedio Anno 1",
-  "Pianoforte Pro Anno 1", "Pianoforte Pro Anno 2",
-  "Producer & Composer Anno Unico Anno 1", "Producer & Composer Biennio Anno 1", "Producer & Composer Biennio Anno 2",
-  "Producer AU Full Anno 1",
-  "Sax Base Anno 1", "Sax Intermedio Anno 1",
-  "SOUND DESIGN PRO Anno 1",
-  "Super Full Anno 1"
-];
+// --- FUNZIONE DI GENERAZIONE AUTOMATICA COURSES_LIST DA CORSI_STRUTTURA ---
+function generateCoursesList(): string[] {
+  const courses: string[] = [];
+  
+  Object.entries(CORSI_STRUTTURA).forEach(([macroCategoria, config]) => {
+    if ('sottocategorie' in config) {
+      // Categorie con sottocategorie (es. STRUMENTO)
+      Object.entries(config.sottocategorie).forEach(([sottoCat, corsi]) => {
+        corsi.forEach(corso => {
+          // Gestione speciale per Batteria Maxxima
+          if (sottoCat === 'Batteria Maxxima') {
+            courses.push(`${sottoCat} ${corso}`);
+          } else {
+            courses.push(`${sottoCat} ${corso}`);
+          }
+        });
+      });
+    } else {
+      // Categorie dirette (es. CANTO, DJ, FONICO)
+      config.corsi.forEach(corso => {
+        // Gestione speciale per GIOVANISSIMI
+        if (macroCategoria === 'GIOVANISSIMI') {
+          courses.push(`${macroCategoria} ${corso.toLowerCase()}`);
+        } else if (macroCategoria === 'FONICO') {
+          courses.push(corso); // Già include "Fonico" nel nome
+        } else if (macroCategoria === 'SOUND DESIGN') {
+          courses.push(`Sound Design ${corso}`);
+        } else if (macroCategoria === 'MUSICA PER IMMAGINI') {
+          courses.push(`Musica per Immagini ${corso}`);
+        } else if (macroCategoria === 'PRODUCER & COMPOSER' || macroCategoria === 'PRODUCER & COMPOSER COMPLETO') {
+          const prefix = macroCategoria === 'PRODUCER & COMPOSER COMPLETO' ? 'Producer & Composer Completo' : 'Producer & Composer';
+          courses.push(`${prefix} ${corso}`);
+        } else if (macroCategoria === 'MUSIC BUSINESS') {
+          courses.push(`Music Business ${corso}`);
+        } else if (macroCategoria === 'EMP PRO') {
+          courses.push(corso); // Già include "EMP PRO" nel nome
+        } else if (macroCategoria === 'DJ') {
+          courses.push(`DJ ${corso}`);
+        } else {
+          courses.push(`${macroCategoria} ${corso}`);
+        }
+      });
+    }
+  });
+  
+  return courses.sort();
+}
+
+// --- LISTA CORSI GENERATA AUTOMATICAMENTE DA CORSI_STRUTTURA ---
+export const COURSES_LIST = generateCoursesList();
 
 export const INITIAL_LEADS: Lead[] = [
   { id: 1, name: 'Marco Rossi', interest: 'Basso Elettrico', source: 'Instagram', status: 'contact' },
