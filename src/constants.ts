@@ -51,6 +51,67 @@ export const COURSE_SUBJECTS: Record<string, { name: string; hours: number; type
   ],
 };
 
+// --- STRUTTURA CORSI PER MACRO-CATEGORIE ---
+export const CORSI_STRUTTURA = {
+  'CANTO': {
+    icon: 'fa-microphone',
+    color: 'bg-pink-500',
+    corsi: ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3']
+  },
+  'STRUMENTO': {
+    icon: 'fa-guitar',
+    color: 'bg-amber-500',
+    sottocategorie: {
+      'Chitarra': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
+      'Basso': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
+      'Pianoforte': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2'],
+      'Batteria': ['Propedeutico', 'Base', 'Intermedio', 'Avanzato', 'Pro 1', 'Pro 2', 'Pro 3'],
+      'Batteria Maxxima': ['Anno 1', 'Anno 2', 'Anno 3', 'Quarto Anno'],
+      'Sax': ['Base', 'Intermedio']
+    }
+  },
+  'DJ': {
+    icon: 'fa-compact-disc',
+    color: 'bg-purple-500',
+    corsi: ['Kids', 'Breve', 'Pro']
+  },
+  'FONICO': {
+    icon: 'fa-sliders-h',
+    color: 'bg-blue-500',
+    corsi: ['Anno Unico', 'Anno Unico Full', 'Biennio Anno 1', 'Biennio Anno 2', 'Super Full']
+  },
+  'SOUND DESIGN': {
+    icon: 'fa-wave-square',
+    color: 'bg-cyan-500',
+    corsi: ['Base', 'Pro']
+  },
+  'MUSICA PER IMMAGINI': {
+    icon: 'fa-film',
+    color: 'bg-indigo-500',
+    corsi: ['Base', 'Pro']
+  },
+  'PRODUCER & COMPOSER': {
+    icon: 'fa-music',
+    color: 'bg-green-500',
+    corsi: ['Anno Unico', 'Biennio Anno 1', 'Biennio Anno 2', 'Full']
+  },
+  'EMP PRO': {
+    icon: 'fa-star',
+    color: 'bg-yellow-500',
+    corsi: ['EMP Pro 1', 'EMP Pro 2', 'EMP Pro 3']
+  },
+  'MUSIC BUSINESS': {
+    icon: 'fa-briefcase',
+    color: 'bg-gray-500',
+    corsi: ['Base', 'Avanzato']
+  },
+  'GIOVANISSIMI': {
+    icon: 'fa-child',
+    color: 'bg-orange-500',
+    corsi: ['Canto', 'Chitarra', 'Basso', 'Batteria', 'Pianoforte']
+  }
+};
+
 // --- LISTA CORSI LEGACY (per compatibilità dropdown esistenti) ---
 export const COURSES_LIST = [
   "Basso Avanzato Anno 1", "Basso Base Anno 1", "Basso Intermedio Anno 1", "Basso Pro Anno 1",
