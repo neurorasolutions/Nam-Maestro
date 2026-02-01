@@ -304,7 +304,6 @@ PRODUCER & COMPOSER COMPLETO
 - [x] **Task 21** - Installazione PWA App Studenti (Android + iOS)
 - [x] **Task 22** - Sistema Messaggistica Email (Gmail SMTP + selezione destinatari)
 - [x] **Task 23** - Cancellazione Utenti Completa (Edge Function delete-user)
-- [x] **Task 29** - Calcolo Automatico Codice Fiscale
 
 ---
 
