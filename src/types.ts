@@ -96,6 +96,8 @@ export interface Student {
   // 7. Marketing & Lead
   marketing_source?: string;
   lead_source?: string;
+  evento_acquisizione?: string;
+  responsabile?: string;
 
   // 8. Workflow Iscrizione
   interview_status?: string;

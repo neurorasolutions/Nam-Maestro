@@ -161,6 +161,19 @@ export const LISTS = {
     'Non interessato'
   ],
 
+  // Eventi di acquisizione
+  EVENTI_ACQUISIZIONE: [
+    'Open Day'
+  ],
+
+  // Responsabili/Operatori segreteria
+  RESPONSABILI: [
+    'Irene',
+    'Silvia',
+    'Claire',
+    'Simone'
+  ],
+
   // Marketing & Lead Sources (usate per "Come ci hai conosciuto" e "Da dove arriva il contatto")
   LEAD_SOURCES: ['Sito Web', 'Passaparola', 'Social Media', 'Evento', 'Altro'],
 

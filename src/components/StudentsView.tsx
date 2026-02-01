@@ -16,7 +16,9 @@ const StudentsView: React.FC = () => {
     search: '',
     course: '',
     type: '',
-    status: ''
+    status: '',
+    evento: '',
+    responsabile: ''
   });
 
   // Stato iniziale vuoto per il form
@@ -235,8 +237,10 @@ const StudentsView: React.FC = () => {
     const matchesCourse = filters.course ? (student.course_1 === filters.course || student.course_2 === filters.course) : true;
     const matchesType = filters.type ? student.course_type === filters.type : true;
     const matchesStatus = filters.status ? student.enrollment_status === filters.status : true;
+    const matchesEvento = filters.evento ? student.evento_acquisizione === filters.evento : true;
+    const matchesResponsabile = filters.responsabile ? student.responsabile === filters.responsabile : true;
 
-    return matchesSearch && matchesCourse && matchesType && matchesStatus;
+    return matchesSearch && matchesCourse && matchesType && matchesStatus && matchesEvento && matchesResponsabile;
   });
 
   // --- LOGICA SELEZIONE ---
@@ -891,6 +895,23 @@ const StudentsView: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase">Evento Acquisizione</label>
+            <select name="evento_acquisizione" value={formData.evento_acquisizione || ''} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+              <option value="">Nessuno</option>
+              {LISTS.EVENTI_ACQUISIZIONE.map(e => <option key={e} value={e}>{e}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase">Responsabile</label>
+            <select name="responsabile" value={formData.responsabile || ''} onChange={handleChange} className="w-full p-2 border border-gray-400 rounded">
+              <option value="">Seleziona...</option>
+              {LISTS.RESPONSABILI.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
             <label className="block text-xs font-bold text-gray-700 uppercase">Stato Iscrizione *</label>
             <select name="enrollment_status" value={formData.enrollment_status} onChange={handleChangeWithValidation} className={`${getInputClass('enrollment_status')} font-bold text-nam-red`}>
               <option value="">Seleziona...</option>
@@ -1010,52 +1031,66 @@ const StudentsView: React.FC = () => {
         </div>
 
         {/* Filtri */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cerca (Nome, Città, Email)</label>
-            <div className="relative">
-              <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-              <input
-                type="text"
-                placeholder="Cerca..."
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                className="w-full pl-10 p-2 border rounded focus:ring-nam-red focus:border-nam-red"
-              />
+        <div className="bg-white p-4 rounded-lg shadow mb-6 space-y-4">
+          {/* Prima riga filtri */}
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cerca (Nome, Città, Email)</label>
+              <div className="relative">
+                <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                <input
+                  type="text"
+                  placeholder="Cerca..."
+                  value={filters.search}
+                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  className="w-full pl-10 p-2 border rounded focus:ring-nam-red focus:border-nam-red"
+                />
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Stato</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full p-2 border border-gray-400 rounded"
-            >
-              <option value="">Tutti gli Stati</option>
-              {LISTS.ENROLLMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Corso</label>
-            <select
-              value={filters.course}
-              onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
-              className="w-full p-2 border border-gray-400 rounded"
-            >
-              <option value="">Tutti i Corsi</option>
-              {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipologia</label>
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-              className="w-full p-2 border border-gray-400 rounded"
-            >
-              <option value="">Tutte le Tipologie</option>
-              {LISTS.COURSE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Stato</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full p-2 border border-gray-400 rounded"
+              >
+                <option value="">Tutti</option>
+                {LISTS.ENROLLMENT_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Corso</label>
+              <select
+                value={filters.course}
+                onChange={(e) => setFilters(prev => ({ ...prev, course: e.target.value }))}
+                className="w-full p-2 border border-gray-400 rounded"
+              >
+                <option value="">Tutti</option>
+                {LISTS.INTEREST_AREAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Evento</label>
+              <select
+                value={filters.evento}
+                onChange={(e) => setFilters(prev => ({ ...prev, evento: e.target.value }))}
+                className="w-full p-2 border border-gray-400 rounded"
+              >
+                <option value="">Tutti</option>
+                {LISTS.EVENTI_ACQUISIZIONE.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Responsabile</label>
+              <select
+                value={filters.responsabile}
+                onChange={(e) => setFilters(prev => ({ ...prev, responsabile: e.target.value }))}
+                className="w-full p-2 border border-gray-400 rounded"
+              >
+                <option value="">Tutti</option>
+                {LISTS.RESPONSABILI.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
