@@ -19,6 +19,7 @@ const DidacticsView: React.FC = () => {
    const [expandedSubcategories, setExpandedSubcategories] = useState<Set<string>>(new Set());
    const [students, setStudents] = useState<Student[]>([]);
    const [searchTerm, setSearchTerm] = useState('');
+   const [selectedCategoryModal, setSelectedCategoryModal] = useState<string | null>(null);
 
    // Carica studenti
    useEffect(() => {
@@ -129,6 +130,8 @@ const DidacticsView: React.FC = () => {
          name.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
+      const selectedConfig = selectedCategoryModal ? CORSI_STRUTTURA[selectedCategoryModal as keyof typeof CORSI_STRUTTURA] : null;
+
       return (
          <div className="p-6">
             <div className="mb-6">
@@ -153,154 +156,152 @@ const DidacticsView: React.FC = () => {
                </span>
             </div>
 
-            {/* Macro-Categorie Accordion */}
-            <div className="space-y-3">
+            {/* Macro-Categorie - Layout Verticale/Griglia */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                {filteredCategories.map(([categoria, config]) => {
-                  const isExpanded = expandedCategories.has(categoria);
                   const totalStudents = countTotalStudentsForCategory(categoria);
                   const hasSubcategories = 'sottocategorie' in config;
 
                   return (
-                     <div key={categoria} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        {/* Header Macro-Categoria */}
-                        <button
-                           onClick={() => toggleCategory(categoria)}
-                           className={`w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-gray-50' : ''}`}
-                        >
-                           <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 ${config.color} rounded-lg flex items-center justify-center text-white shadow-md`}>
-                                 <i className={`fas ${config.icon} text-xl`}></i>
+                     <button
+                        key={categoria}
+                        onClick={() => setSelectedCategoryModal(categoria)}
+                        className="bg-white rounded-xl shadow-sm border-2 border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all p-5 text-left group h-full flex flex-col"
+                     >
+                        <div className="flex flex-col gap-3 flex-1">
+                           <div className="flex items-center gap-3">
+                              <div className={`w-14 h-14 flex-shrink-0 ${config.color} rounded-xl flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform`}>
+                                 <i className={`fas ${config.icon} text-2xl`}></i>
                               </div>
-                              <div className="text-left">
-                                 <h3 className="font-bold text-gray-800 text-lg">{categoria}</h3>
-                                 <p className="text-sm text-gray-500">
+                              <div className="flex-1 min-w-0">
+                                 <h3 className="font-bold text-gray-800 text-lg leading-tight">{categoria}</h3>
+                                 <p className="text-xs text-gray-500 mt-1">
                                     {hasSubcategories
                                        ? `${Object.keys(config.sottocategorie).length} strumenti`
                                        : `${config.corsi.length} livelli`}
-                                    {totalStudents > 0 && (
-                                       <span className="ml-2 text-blue-600">• {totalStudents} iscritti</span>
-                                    )}
                                  </p>
                               </div>
                            </div>
-                           <div className="flex items-center gap-3">
-                              {totalStudents > 0 && (
-                                 <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                                    {totalStudents}
-                                 </span>
-                              )}
-                              <i className={`fas fa-chevron-down text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
+
+                           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+                              <span className="text-xs text-gray-500">Iscritti</span>
+                              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                                 {totalStudents > 0 ? totalStudents : 0}
+                              </span>
                            </div>
-                        </button>
-
-                        {/* Contenuto Espanso */}
-                        {isExpanded && (
-                           <div className="border-t border-gray-200 bg-gray-50 p-4">
-                              {hasSubcategories ? (
-                                 // Sottocategorie (es. Strumenti) - LAYOUT ORIZZONTALE
-                                 <div>
-                                    {/* Pulsanti sottocategorie in orizzontale */}
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                       {Object.keys(config.sottocategorie).map((sottoCat) => {
-                                          const isSubExpanded = expandedSubcategories.has(`${categoria}-${sottoCat}`);
-                                          const corsi = config.sottocategorie[sottoCat];
-                                          return (
-                                             <button
-                                                key={sottoCat}
-                                                onClick={() => toggleSubcategory(`${categoria}-${sottoCat}`)}
-                                                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isSubExpanded
-                                                      ? 'bg-gray-700 text-white border-2 border-gray-700'
-                                                      : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-gray-400'
-                                                   }`}
-                                             >
-                                                {sottoCat}
-                                                <span className={`ml-2 text-xs ${isSubExpanded ? 'text-gray-300' : 'text-gray-400'}`}>
-                                                   ({corsi.length})
-                                                </span>
-                                             </button>
-                                          );
-                                       })}
-                                    </div>
-
-                                    {/* Livelli della sottocategoria selezionata - GRIGLIA ORIZZONTALE */}
-                                    {Object.entries(config.sottocategorie).map(([sottoCat, corsi]) => {
-                                       const isSubExpanded = expandedSubcategories.has(`${categoria}-${sottoCat}`);
-                                       if (!isSubExpanded) return null;
-
-                                       return (
-                                          <div key={sottoCat} className="bg-gray-50 rounded-lg p-4">
-                                             <h4 className="font-semibold text-gray-700 mb-3">{sottoCat}</h4>
-                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                                {corsi.map((corso) => {
-                                                   const studentiCorso = getStudentsForCourse(categoria, corso, sottoCat);
-                                                   return (
-                                                      <div key={corso} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
-                                                         <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-sm font-medium text-gray-700">{corso}</span>
-                                                            <span className={`text-xs px-2 py-1 rounded ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                               {studentiCorso.length}
-                                                            </span>
-                                                         </div>
-                                                         {studentiCorso.length > 0 && (
-                                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                               {studentiCorso.slice(0, 3).map(s => (
-                                                                  <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                                                     {s.first_name} {s.last_name?.[0]}.
-                                                                  </span>
-                                                               ))}
-                                                               {studentiCorso.length > 3 && (
-                                                                  <span className="text-xs text-gray-500 px-2 py-1">
-                                                                     +{studentiCorso.length - 3}
-                                                                  </span>
-                                                               )}
-                                                            </div>
-                                                         )}
-                                                      </div>
-                                                   );
-                                                })}
-                                             </div>
-                                          </div>
-                                       );
-                                    })}
-                                 </div>
-                              ) : (
-                                 // Corsi diretti (senza sottocategorie)
-                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {config.corsi.map((corso) => {
-                                       const studentiCorso = getStudentsForCourse(categoria, corso);
-                                       return (
-                                          <div key={corso} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
-                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="font-medium text-gray-700">{corso}</span>
-                                                <span className={`text-xs px-2 py-1 rounded ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                   {studentiCorso.length} iscritti
-                                                </span>
-                                             </div>
-                                             {studentiCorso.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-2">
-                                                   {studentiCorso.slice(0, 5).map(s => (
-                                                      <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                                         {s.first_name} {s.last_name?.[0]}.
-                                                      </span>
-                                                   ))}
-                                                   {studentiCorso.length > 5 && (
-                                                      <span className="text-xs text-gray-500 px-2 py-1">
-                                                         +{studentiCorso.length - 5} altri
-                                                      </span>
-                                                   )}
-                                                </div>
-                                             )}
-                                          </div>
-                                       );
-                                    })}
-                                 </div>
-                              )}
-                           </div>
-                        )}
-                     </div>
+                        </div>
+                     </button>
                   );
                })}
             </div>
+
+            {/* Modal Popup per visualizzare i dettagli della categoria */}
+            {selectedCategoryModal && selectedConfig && (
+               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedCategoryModal(null)}>
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                     {/* Header Modal */}
+                     <div className={`${selectedConfig.color} text-white p-6 flex items-center justify-between`}>
+                        <div className="flex items-center gap-4">
+                           <div className="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center shadow-lg">
+                              <i className={`fas ${selectedConfig.icon} text-3xl`}></i>
+                           </div>
+                           <div>
+                              <h2 className="text-2xl font-bold">{selectedCategoryModal}</h2>
+                              <p className="text-white text-opacity-80 text-sm mt-1">
+                                 {'sottocategorie' in selectedConfig
+                                    ? `${Object.keys(selectedConfig.sottocategorie).length} strumenti • ${countTotalStudentsForCategory(selectedCategoryModal)} iscritti`
+                                    : `${selectedConfig.corsi.length} livelli • ${countTotalStudentsForCategory(selectedCategoryModal)} iscritti`}
+                              </p>
+                           </div>
+                        </div>
+                        <button
+                           onClick={() => setSelectedCategoryModal(null)}
+                           className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all"
+                        >
+                           <i className="fas fa-times text-xl"></i>
+                        </button>
+                     </div>
+
+                     {/* Contenuto Modal */}
+                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                        {'sottocategorie' in selectedConfig ? (
+                           // Sottocategorie (es. Strumenti)
+                           <div className="space-y-6">
+                              {Object.entries(selectedConfig.sottocategorie).map(([sottoCat, corsi]) => (
+                                 <div key={sottoCat} className="bg-gray-50 rounded-xl p-5">
+                                    <h4 className="font-bold text-gray-800 text-lg mb-4 flex items-center gap-2">
+                                       <span className={`w-2 h-2 ${selectedConfig.color} rounded-full`}></span>
+                                       {sottoCat}
+                                       <span className="text-sm text-gray-500 font-normal">({corsi.length} livelli)</span>
+                                    </h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                       {corsi.map((corso) => {
+                                          const studentiCorso = getStudentsForCourse(selectedCategoryModal, corso, sottoCat);
+                                          return (
+                                             <div key={corso} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                                                <div className="flex items-center justify-between mb-2">
+                                                   <span className="text-sm font-semibold text-gray-700">{corso}</span>
+                                                   <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                      {studentiCorso.length}
+                                                   </span>
+                                                </div>
+                                                {studentiCorso.length > 0 && (
+                                                   <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-100">
+                                                      {studentiCorso.slice(0, 3).map(s => (
+                                                         <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                                            {s.first_name} {s.last_name?.[0]}.
+                                                         </span>
+                                                      ))}
+                                                      {studentiCorso.length > 3 && (
+                                                         <span className="text-xs text-gray-500 px-2 py-1">
+                                                            +{studentiCorso.length - 3}
+                                                         </span>
+                                                      )}
+                                                   </div>
+                                                )}
+                                             </div>
+                                          );
+                                       })}
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
+                        ) : (
+                           // Corsi diretti (senza sottocategorie)
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {selectedConfig.corsi.map((corso) => {
+                                 const studentiCorso = getStudentsForCourse(selectedCategoryModal, corso);
+                                 return (
+                                    <div key={corso} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                                       <div className="flex items-center justify-between mb-2">
+                                          <span className="font-semibold text-gray-800">{corso}</span>
+                                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                             {studentiCorso.length}
+                                          </span>
+                                       </div>
+                                       {studentiCorso.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-200">
+                                             {studentiCorso.slice(0, 5).map(s => (
+                                                <span key={s.id} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
+                                                   {s.first_name} {s.last_name?.[0]}.
+                                                </span>
+                                             ))}
+                                             {studentiCorso.length > 5 && (
+                                                <span className="text-xs text-gray-500 px-2 py-1">
+                                                   +{studentiCorso.length - 5} altri
+                                                </span>
+                                             )}
+                                          </div>
+                                       )}
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        )}
+                     </div>
+                  </div>
+               </div>
+            )}
          </div>
       );
    };
