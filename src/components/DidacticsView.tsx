@@ -157,6 +157,18 @@ const DidacticsView: React.FC = () => {
 
       const selectedConfig = selectedCategoryModal ? CORSI_STRUTTURA[selectedCategoryModal as keyof typeof CORSI_STRUTTURA] : null;
 
+      // Raggruppa piani dinamici per categoria
+      const getDynamicPlansForCategory = (categoria: string) => {
+         return studyPlans.filter(plan =>
+            plan.category.toUpperCase() === categoria.toUpperCase()
+         );
+      };
+
+      // Conta piani dinamici per categoria
+      const countDynamicPlansForCategory = (categoria: string) => {
+         return getDynamicPlansForCategory(categoria).length;
+      };
+
       return (
          <div className="p-6">
             <div className="mb-6 flex justify-between items-start">
@@ -195,6 +207,7 @@ const DidacticsView: React.FC = () => {
                {filteredCategories.map(([categoria, config]) => {
                   const totalStudents = countTotalStudentsForCategory(categoria);
                   const hasSubcategories = 'sottocategorie' in config;
+                  const dynamicPlansCount = countDynamicPlansForCategory(categoria);
 
                   return (
                      <button
@@ -213,6 +226,11 @@ const DidacticsView: React.FC = () => {
                                     {hasSubcategories
                                        ? `${Object.keys(config.sottocategorie).length} strumenti`
                                        : `${config.corsi.length} livelli`}
+                                    {dynamicPlansCount > 0 && (
+                                       <span className="text-blue-600 font-semibold ml-1">
+                                          • {dynamicPlansCount} personalizzati
+                                       </span>
+                                    )}
                                  </p>
                               </div>
                            </div>
@@ -330,6 +348,76 @@ const DidacticsView: React.FC = () => {
                                     </div>
                                  );
                               })}
+                           </div>
+                        )}
+
+                        {/* Piani Personalizzati - Creati dal Database */}
+                        {selectedCategoryModal && getDynamicPlansForCategory(selectedCategoryModal).length > 0 && (
+                           <div className="mt-8 pt-6 border-t-2 border-gray-200">
+                              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                 <i className="fas fa-layer-group text-blue-600"></i>
+                                 Piani Personalizzati
+                                 <span className="text-sm text-gray-500 font-normal">
+                                    ({getDynamicPlansForCategory(selectedCategoryModal).length})
+                                 </span>
+                              </h3>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                 {getDynamicPlansForCategory(selectedCategoryModal).map((plan) => {
+                                    const studentiPiano = students.filter(s => s.study_plan_id === plan.id);
+                                    return (
+                                       <div key={plan.id} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-4 hover:shadow-lg transition-all">
+                                          <div className="flex items-start justify-between mb-3">
+                                             <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                   <i className="fas fa-certificate text-blue-600 text-sm"></i>
+                                                   <span className="font-bold text-gray-800">{plan.name}</span>
+                                                </div>
+                                                {plan.subcategory && (
+                                                   <span className="text-xs text-blue-600 font-medium">{plan.subcategory}</span>
+                                                )}
+                                             </div>
+                                             <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiPiano.length > 0 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                                {studentiPiano.length}
+                                             </span>
+                                          </div>
+
+                                          {plan.description && (
+                                             <p className="text-xs text-gray-600 mb-3 line-clamp-2">{plan.description}</p>
+                                          )}
+
+                                          <div className="flex items-center gap-3 text-xs text-gray-600 mb-3 pb-3 border-b border-blue-200">
+                                             <span className="flex items-center gap-1">
+                                                <i className="fas fa-clock"></i>
+                                                {plan.total_hours || 0}h
+                                             </span>
+                                             <span className="flex items-center gap-1">
+                                                <i className="fas fa-user"></i>
+                                                {plan.total_individual_hours || 0}h
+                                             </span>
+                                             <span className="flex items-center gap-1">
+                                                <i className="fas fa-users"></i>
+                                                {plan.total_collective_hours || 0}h
+                                             </span>
+                                          </div>
+
+                                          {studentiPiano.length > 0 && (
+                                             <div className="flex flex-wrap gap-1">
+                                                {studentiPiano.slice(0, 3).map(s => (
+                                                   <span key={s.id} className="text-xs bg-white px-2 py-1 rounded border border-blue-300">
+                                                      {s.first_name} {s.last_name?.[0]}.
+                                                   </span>
+                                                ))}
+                                                {studentiPiano.length > 3 && (
+                                                   <span className="text-xs text-blue-600 px-2 py-1 font-medium">
+                                                      +{studentiPiano.length - 3}
+                                                   </span>
+                                                )}
+                                             </div>
+                                          )}
+                                       </div>
+                                    );
+                                 })}
+                              </div>
                            </div>
                         )}
                      </div>
