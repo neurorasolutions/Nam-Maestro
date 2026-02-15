@@ -277,7 +277,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
           lesson_date: lessonDateStr,
           start_time: startTime,
           end_time: endTime,
-          type: subjectType === 'collective' ? 'collective' : 'lesson',
+          is_hybrid: false,
         });
 
         lessonsCreated++;
