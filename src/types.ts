@@ -127,4 +127,36 @@ export interface Student {
 
   // 12. Autenticazione
   auth_user_id?: string;
+
+  // 13. Piano di Studi (nuovo sistema)
+  study_plan_id?: string; // FK a study_plans
+}
+
+// --- INTERFACCE PIANI DI STUDIO ---
+
+export interface StudyPlan {
+  id?: string;
+  name: string;
+  description?: string;
+  category: string;
+  subcategory?: string;
+  is_active?: boolean;
+  total_hours?: number;
+  total_individual_hours?: number;
+  total_collective_hours?: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudyPlanSubject {
+  id?: string;
+  study_plan_id: string;
+  subject_name: string;
+  subject_type: 'individual' | 'collective';
+  total_hours: number;
+  teacher_name?: string;
+  order_index?: number;
+  created_at?: string;
+  updated_at?: string;
 }

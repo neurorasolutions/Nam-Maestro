@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CORSI_STRUTTURA } from '../constants';
 import { supabase } from '../lib/supabaseClient';
-import { Student } from '../types';
+import { Student, StudyPlan, StudyPlanSubject } from '../types';
+import CreateStudyPlanModal from './CreateStudyPlanModal';
 
 // Tipo per le sottosezioni della Didattica
 type DidacticsSubSection =
@@ -21,6 +22,10 @@ const DidacticsView: React.FC = () => {
    const [searchTerm, setSearchTerm] = useState('');
    const [selectedCategoryModal, setSelectedCategoryModal] = useState<string | null>(null);
 
+   // Nuovo: State per piani di studio
+   const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+
    // Carica studenti
    useEffect(() => {
       const fetchStudents = async () => {
@@ -29,6 +34,23 @@ const DidacticsView: React.FC = () => {
       };
       fetchStudents();
    }, []);
+
+   // Carica piani di studio
+   useEffect(() => {
+      fetchStudyPlans();
+   }, []);
+
+   const fetchStudyPlans = async () => {
+      const { data, error } = await supabase
+         .from('study_plans')
+         .select('*')
+         .eq('is_active', true)
+         .order('created_at', { ascending: false });
+
+      if (!error && data) {
+         setStudyPlans(data);
+      }
+   };
 
    // Menu items per la sidebar interna
    const subMenuItems: { id: DidacticsSubSection; label: string; icon: string }[] = [
@@ -134,9 +156,18 @@ const DidacticsView: React.FC = () => {
 
       return (
          <div className="p-6">
-            <div className="mb-6">
-               <h2 className="text-2xl font-bold text-gray-800">Piani di Studi</h2>
-               <p className="text-gray-500 text-sm mt-1">Corsi organizzati per macro-categoria</p>
+            <div className="mb-6 flex justify-between items-start">
+               <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Piani di Studi</h2>
+                  <p className="text-gray-500 text-sm mt-1">Corsi organizzati per macro-categoria</p>
+               </div>
+               <button
+                  onClick={() => setShowCreatePlanModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+               >
+                  <i className="fas fa-plus"></i>
+                  Crea Piano di Studio
+               </button>
             </div>
 
             {/* Barra ricerca */}
@@ -306,6 +337,150 @@ const DidacticsView: React.FC = () => {
       );
    };
 
+   // Vista Corsi Collettivi
+   const CorsiCollettiviView = () => {
+      const [collectiveSubjects, setCollectiveSubjects] = useState<(StudyPlanSubject & { plan_name?: string })[]>([]);
+
+      useEffect(() => {
+         const fetchCollectiveSubjects = async () => {
+            const { data, error } = await supabase
+               .from('study_plan_subjects')
+               .select(`
+                  *,
+                  study_plans!inner(name, is_active)
+               `)
+               .eq('subject_type', 'collective')
+               .eq('study_plans.is_active', true);
+
+            if (!error && data) {
+               const formatted = data.map((item: any) => ({
+                  ...item,
+                  plan_name: item.study_plans?.name,
+               }));
+               setCollectiveSubjects(formatted);
+            }
+         };
+
+         fetchCollectiveSubjects();
+      }, []);
+
+      return (
+         <div className="p-6">
+            <div className="mb-6">
+               <h2 className="text-2xl font-bold text-gray-800">Corsi Collettivi</h2>
+               <p className="text-gray-500 text-sm mt-1">Materie collettive dai piani di studio attivi</p>
+            </div>
+
+            {collectiveSubjects.length === 0 ? (
+               <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <i className="fas fa-users text-4xl text-gray-400 mb-3"></i>
+                  <p className="text-gray-500">Nessun corso collettivo configurato</p>
+               </div>
+            ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {collectiveSubjects.map((subject) => (
+                     <div key={subject.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-3">
+                           <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900 text-lg">{subject.subject_name}</h3>
+                              <p className="text-sm text-gray-500 mt-1">{subject.plan_name}</p>
+                           </div>
+                           <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">
+                              Collettivo
+                           </span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                           <div className="flex items-center gap-2 text-gray-600">
+                              <i className="fas fa-clock w-4"></i>
+                              <span>{subject.total_hours} ore totali</span>
+                           </div>
+                           {subject.teacher_name && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                 <i className="fas fa-user w-4"></i>
+                                 <span>{subject.teacher_name}</span>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  ))}
+               </div>
+            )}
+         </div>
+      );
+   };
+
+   // Vista Lezioni Individuali
+   const LezioniIndividualiView = () => {
+      const [individualSubjects, setIndividualSubjects] = useState<(StudyPlanSubject & { plan_name?: string })[]>([]);
+
+      useEffect(() => {
+         const fetchIndividualSubjects = async () => {
+            const { data, error } = await supabase
+               .from('study_plan_subjects')
+               .select(`
+                  *,
+                  study_plans!inner(name, is_active)
+               `)
+               .eq('subject_type', 'individual')
+               .eq('study_plans.is_active', true);
+
+            if (!error && data) {
+               const formatted = data.map((item: any) => ({
+                  ...item,
+                  plan_name: item.study_plans?.name,
+               }));
+               setIndividualSubjects(formatted);
+            }
+         };
+
+         fetchIndividualSubjects();
+      }, []);
+
+      return (
+         <div className="p-6">
+            <div className="mb-6">
+               <h2 className="text-2xl font-bold text-gray-800">Lezioni Individuali</h2>
+               <p className="text-gray-500 text-sm mt-1">Materie individuali dai piani di studio attivi</p>
+            </div>
+
+            {individualSubjects.length === 0 ? (
+               <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <i className="fas fa-chalkboard-teacher text-4xl text-gray-400 mb-3"></i>
+                  <p className="text-gray-500">Nessuna lezione individuale configurata</p>
+               </div>
+            ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {individualSubjects.map((subject) => (
+                     <div key={subject.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-3">
+                           <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900 text-lg">{subject.subject_name}</h3>
+                              <p className="text-sm text-gray-500 mt-1">{subject.plan_name}</p>
+                           </div>
+                           <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">
+                              Individuale
+                           </span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                           <div className="flex items-center gap-2 text-gray-600">
+                              <i className="fas fa-clock w-4"></i>
+                              <span>{subject.total_hours} ore totali</span>
+                           </div>
+                           {subject.teacher_name && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                 <i className="fas fa-user w-4"></i>
+                                 <span>{subject.teacher_name}</span>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  ))}
+               </div>
+            )}
+         </div>
+      );
+   };
+
    // Render del contenuto principale in base alla sottosezione attiva
    const renderContent = () => {
       switch (activeSubSection) {
@@ -314,9 +489,9 @@ const DidacticsView: React.FC = () => {
          case 'pre_iscrizioni':
             return <InProduzioneView section="Pre-iscrizioni" />;
          case 'corsi_collettivi':
-            return <InProduzioneView section="Corsi Collettivi" />;
+            return <CorsiCollettiviView />;
          case 'lezioni_individuali':
-            return <InProduzioneView section="Lezioni Individuali" />;
+            return <LezioniIndividualiView />;
          case 'carnet':
             return <InProduzioneView section="Carnet di Lezioni" />;
          case 'presenze':
@@ -359,6 +534,17 @@ const DidacticsView: React.FC = () => {
          <div className="flex-1 overflow-auto bg-gray-50">
             {renderContent()}
          </div>
+
+         {/* Modal Creazione Piano di Studio */}
+         {showCreatePlanModal && (
+            <CreateStudyPlanModal
+               onClose={() => setShowCreatePlanModal(false)}
+               onSuccess={() => {
+                  setShowCreatePlanModal(false);
+                  fetchStudyPlans();
+               }}
+            />
+         )}
       </div>
    );
 };

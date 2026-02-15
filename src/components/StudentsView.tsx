@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { LISTS, COURSES_LIST } from '../constants';
-import { Student } from '../types';
+import { Student, StudyPlan } from '../types';
 import CodiceFiscale from 'codice-fiscale-js';
 
 const StudentsView: React.FC = () => {
@@ -21,6 +21,9 @@ const StudentsView: React.FC = () => {
     evento: '',
     responsabile: ''
   });
+
+  // Stato per i Piani di Studio
+  const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
 
   // Stato iniziale vuoto per il form
   const initialFormState: Partial<Student> = {
@@ -229,6 +232,23 @@ const StudentsView: React.FC = () => {
       fetchStudents();
     }
   }, [viewMode]);
+
+  // Carica piani di studio disponibili
+  useEffect(() => {
+    const fetchStudyPlans = async () => {
+      const { data, error } = await supabase
+        .from('study_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (!error && data) {
+        setStudyPlans(data);
+      }
+    };
+
+    fetchStudyPlans();
+  }, []);
 
   // Calcolo automatico Codice Fiscale
   useEffect(() => {
@@ -893,6 +913,50 @@ const StudentsView: React.FC = () => {
           {validationErrors.course_type && <span className="text-xs text-red-500">{validationErrors.course_type}</span>}
         </div>
 
+        {/* PIANO DI STUDI - Nuovo campo opzionale */}
+        <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(30, 144, 255, 0.05)', border: '2px solid #1E90FF' }}>
+          <label className="block text-xs font-bold uppercase mb-1" style={{ color: '#1E90FF' }}>
+            🎓 Piano di Studi (opzionale)
+          </label>
+          <p className="text-xs mb-2" style={{ color: '#1E90FF' }}>
+            Seleziona un piano di studi predefinito. Il campo "Corso di Iscrizione" verrà auto-popolato.
+          </p>
+          <select
+            name="study_plan_id"
+            value={formData.study_plan_id || ''}
+            onChange={(e) => {
+              const planId = e.target.value;
+              const selectedPlan = studyPlans.find(p => p.id === planId);
+
+              handleChange(e);
+
+              // Auto-popola enrolled_course con il nome del piano
+              if (selectedPlan) {
+                setFormData(prev => ({
+                  ...prev,
+                  study_plan_id: planId,
+                  enrolled_course: selectedPlan.name
+                }));
+              } else {
+                setFormData(prev => ({
+                  ...prev,
+                  study_plan_id: undefined,
+                  enrolled_course: undefined
+                }));
+              }
+            }}
+            className="w-full p-2 rounded font-bold bg-white"
+            style={{ border: '2px solid #1E90FF', color: '#1E90FF' }}
+          >
+            <option value="">-- Nessun Piano di Studi --</option>
+            {studyPlans.map(plan => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name} ({plan.category})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* CORSO DI ISCRIZIONE EFFETTIVO - scrive in enrolled_course */}
         <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(11, 19, 43, 0.05)', border: '2px solid #0B132B' }}>
           <label className="block text-xs font-bold uppercase mb-1" style={{ color: '#0B132B' }}>
@@ -909,7 +973,18 @@ const StudentsView: React.FC = () => {
             style={{ border: validationErrors.enrolled_course ? '2px solid #ef4444' : '2px solid #0B132B', color: '#0B132B' }}
           >
             <option value="">-- Seleziona Corso Effettivo --</option>
-            {COURSES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+            <optgroup label="Corsi Tradizionali">
+              {COURSES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+            </optgroup>
+            {studyPlans.length > 0 && (
+              <optgroup label="Piani di Studio">
+                {studyPlans.map(plan => (
+                  <option key={`plan-${plan.id}`} value={plan.name}>
+                    {plan.name} ({plan.category})
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           {validationErrors.enrolled_course && <span className="text-xs text-red-500">{validationErrors.enrolled_course}</span>}
         </div>
