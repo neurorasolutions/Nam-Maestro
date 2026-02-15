@@ -27,14 +27,17 @@ const DAYS_OF_WEEK = [
 ];
 
 const ROOMS = [
-  'Aula 1',
-  'Aula 2',
-  'Aula 3',
-  'Aula 4',
-  'Aula 5',
-  'Sala Prove 1',
-  'Sala Prove 2',
   'Auditorium',
+  'Aula Canto',
+  'Aula Canto e strumento 1° Piano',
+  'Aula Digital',
+  'Aula Online',
+  'Aula Strumento Piano Terra',
+  'Aula Teoria 1',
+  'Aula Teoria 2',
+  'Aula X',
+  'Studio A',
+  'Studio B',
 ];
 
 export default function CalendarWizard({ subjects, onComplete, onCancel }: CalendarWizardProps) {

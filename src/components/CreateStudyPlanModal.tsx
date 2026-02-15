@@ -22,6 +22,7 @@ type WizardStep = 1 | 2 | 3;
 
 interface SubjectForm extends Omit<StudyPlanSubject, 'id' | 'study_plan_id' | 'created_at' | 'updated_at'> {
   tempId: string; // ID temporaneo per gestione UI
+  teacherSelectMode?: 'list' | 'search'; // Modalità selezione docente
 }
 
 export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudyPlanModalProps) {
@@ -93,6 +94,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
       total_hours: 20,
       teacher_name: firstTeacher,
       order_index: subjects.length,
+      teacherSelectMode: 'list', // Default: selezione da lista
     };
     setSubjects([...subjects, newSubject]);
   };
@@ -497,26 +499,100 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
                         </div>
 
                         <div className="col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Docente {teachers.length === 0 && <span className="text-xs text-gray-500">(caricamento...)</span>}
                           </label>
-                          <input
-                            list={`teachers-list-${subject.tempId}`}
-                            value={subject.teacher_name || ''}
-                            onChange={(e) => updateSubject(subject.tempId, 'teacher_name', e.target.value)}
-                            placeholder="Cerca e seleziona docente..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                          />
-                          <datalist id={`teachers-list-${subject.tempId}`}>
-                            {teachers.map(teacher => (
-                              <option
-                                key={teacher.id}
-                                value={`${teacher.first_name} ${teacher.last_name}`}
+
+                          {/* Tab per scegliere modalità selezione */}
+                          <div className="flex gap-2 mb-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentMode = (subject as any).teacherSelectMode || 'list';
+                                updateSubject(subject.tempId, 'teacherSelectMode' as any, currentMode === 'list' ? 'list' : 'list');
+                              }}
+                              className={`px-3 py-1 text-xs rounded ${
+                                ((subject as any).teacherSelectMode || 'list') === 'list'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}
+                            >
+                              📋 Seleziona da lista
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateSubject(subject.tempId, 'teacherSelectMode' as any, 'search');
+                              }}
+                              className={`px-3 py-1 text-xs rounded ${
+                                (subject as any).teacherSelectMode === 'search'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}
+                            >
+                              🔍 Cerca per nome
+                            </button>
+                          </div>
+
+                          {/* Modalità 1: Seleziona da lista */}
+                          {((subject as any).teacherSelectMode || 'list') === 'list' ? (
+                            <select
+                              value={subject.teacher_name || ''}
+                              onChange={(e) => updateSubject(subject.tempId, 'teacher_name', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 max-h-48"
+                            >
+                              <option value="">-- Seleziona un docente --</option>
+                              {teachers.map(teacher => (
+                                <option
+                                  key={teacher.id}
+                                  value={`${teacher.first_name} ${teacher.last_name}`}
+                                >
+                                  {teacher.last_name} {teacher.first_name}
+                                  {teacher.subjects_taught && ` • ${teacher.subjects_taught.split(',')[0].trim()}`}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            /* Modalità 2: Cerca per nome */
+                            <div>
+                              <input
+                                type="text"
+                                value={subject.teacher_name || ''}
+                                onChange={(e) => updateSubject(subject.tempId, 'teacher_name', e.target.value)}
+                                placeholder="Digita nome o cognome del docente..."
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                               />
-                            ))}
-                          </datalist>
+                              {/* Suggerimenti in tempo reale */}
+                              {subject.teacher_name && (
+                                <div className="mt-1 max-h-32 overflow-y-auto border border-gray-200 rounded-md bg-white shadow-sm">
+                                  {teachers
+                                    .filter(t =>
+                                      `${t.first_name} ${t.last_name}`.toLowerCase().includes((subject.teacher_name || '').toLowerCase())
+                                    )
+                                    .slice(0, 5)
+                                    .map(teacher => (
+                                      <button
+                                        key={teacher.id}
+                                        type="button"
+                                        onClick={() => updateSubject(subject.tempId, 'teacher_name', `${teacher.first_name} ${teacher.last_name}`)}
+                                        className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                                      >
+                                        <span className="font-medium">{teacher.last_name} {teacher.first_name}</span>
+                                        {teacher.subjects_taught && (
+                                          <span className="text-gray-500 text-xs ml-2">
+                                            • {teacher.subjects_taught.split(',')[0].trim()}
+                                          </span>
+                                        )}
+                                      </button>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <p className="text-xs text-gray-500 mt-1">
-                            {teachers.length} docenti disponibili • Digita per cercare
+                            {teachers.length} docenti disponibili
+                            {(subject as any).teacherSelectMode === 'search' && ' • Inizia a digitare per filtrare'}
                           </p>
                         </div>
                       </div>
