@@ -14,11 +14,13 @@ interface SubjectSchedule {
 
 interface CalendarWizardProps {
   subjects: StudyPlanSubject[];
-  onComplete: (schedules: SubjectSchedule[], startDate: string, endDate: string) => void;
+  onComplete: (schedules: SubjectSchedule[], startDate: string, endDate: string, hoursPerLesson: number) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
 const DAYS_OF_WEEK = [
+  { value: 0, label: 'Domenica' },
   { value: 1, label: 'Lunedì' },
   { value: 2, label: 'Martedì' },
   { value: 3, label: 'Mercoledì' },
@@ -41,7 +43,7 @@ const ROOMS = [
   'Studio B',
 ];
 
-export default function CalendarWizard({ subjects, onComplete, onCancel }: CalendarWizardProps) {
+export default function CalendarWizard({ subjects, onComplete, onCancel, isSubmitting = false }: CalendarWizardProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [hoursPerLesson, setHoursPerLesson] = useState(2); // Ore per lezione (default 2)
@@ -136,7 +138,7 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
 
   const handleSubmit = () => {
     if (validateSchedules()) {
-      onComplete(schedules, startDate, endDate);
+      onComplete(schedules, startDate, endDate, hoursPerLesson);
     }
   };
 
@@ -150,6 +152,17 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {/* Loading Overlay */}
+      {isSubmitting && (
+        <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-lg font-medium text-gray-900">Generazione lezioni in corso...</p>
+            <p className="text-sm text-gray-500">Attendere, potrebbero essere necessari alcuni secondi</p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
@@ -277,7 +290,7 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
                           ~{estimatedLessons} lezioni
                         </div>
                         <div className="text-xs text-gray-500">
-                          (2 ore/lezione)
+                          ({hoursPerLesson} ore/lezione)
                         </div>
                       </div>
                     )}
@@ -359,16 +372,18 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            disabled={isSubmitting}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Annulla
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Genera Lezioni
+            {isSubmitting ? 'Generazione in corso...' : 'Genera Lezioni'}
           </button>
         </div>
       </div>

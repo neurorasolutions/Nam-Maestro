@@ -132,11 +132,13 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
   // ========== STEP 3 FUNCTIONS (Calendarizzazione) ==========
 
-  const handleCalendarComplete = async (schedules: any[], startDate: string, endDate: string) => {
+  const handleCalendarComplete = async (schedules: any[], startDate: string, endDate: string, hoursPerLesson: number) => {
     setIsSubmitting(true);
     setErrors([]);
 
     try {
+      console.log('🚀 Inizio creazione piano di studio:', planName);
+
       // 1. Crea il piano di studio
       const { data: newPlan, error: planError } = await supabase
         .from('study_plans')
@@ -150,7 +152,11 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
         .select()
         .single();
 
-      if (planError) throw planError;
+      if (planError) {
+        console.error('❌ Errore creazione piano:', planError);
+        throw planError;
+      }
+      console.log('✅ Piano creato:', newPlan.id);
 
       // 2. Inserisci le materie
       const subjectsToInsert = subjects.map((subject, idx) => ({
@@ -167,7 +173,11 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
         .insert(subjectsToInsert)
         .select();
 
-      if (subjectsError) throw subjectsError;
+      if (subjectsError) {
+        console.error('❌ Errore inserimento materie:', subjectsError);
+        throw subjectsError;
+      }
+      console.log(`✅ Materie inserite: ${insertedSubjects.length}`);
 
       // 3. Genera lezioni ricorrenti
       const lessonsToInsert: any[] = [];
@@ -188,26 +198,38 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
           schedule.endTime,
           schedule.room,
           startDate,
-          endDate
+          endDate,
+          hoursPerLesson
         );
 
         lessonsToInsert.push(...lessons);
       }
+
+      console.log(`📅 Lezioni totali da inserire: ${lessonsToInsert.length}`);
 
       if (lessonsToInsert.length > 0) {
         const { error: lessonsError } = await supabase
           .from('lessons')
           .insert(lessonsToInsert);
 
-        if (lessonsError) throw lessonsError;
+        if (lessonsError) {
+          console.error('❌ Errore inserimento lezioni:', lessonsError);
+          throw lessonsError;
+        }
+        console.log('✅ Lezioni inserite nel calendario');
       }
 
       // Successo!
+      alert(`✅ Piano di studio "${planName}" creato con successo!\n\n📚 Materie: ${insertedSubjects.length}\n📅 Lezioni generate: ${lessonsToInsert.length}`);
+
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Errore creazione piano:', error);
-      setErrors([error.message || 'Errore durante la creazione del piano di studio']);
+      console.error('❌ ERRORE COMPLETO:', error);
+      const errorMessage = error.message || 'Errore durante la creazione del piano di studio';
+      setErrors([errorMessage]);
+      setShowCalendarWizard(false); // Torna al modal per mostrare l'errore
+      alert(`❌ Errore durante la creazione del piano:\n\n${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,10 +246,10 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
     endTime: string,
     room: string,
     startDateStr: string,
-    endDateStr: string
+    endDateStr: string,
+    hoursPerLesson: number
   ): any[] => {
     const lessons: any[] = [];
-    const hoursPerLesson = 2; // Default
     const totalLessonsNeeded = Math.ceil(totalHours / hoursPerLesson);
 
     let currentDate = new Date(startDateStr);
@@ -243,8 +265,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
       // Verifica se è un giorno valido per la lezione
       const isValidDay =
-        daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato
-        dayOfWeek !== 0 && dayOfWeek !== 6 && // Non weekend (domenica=0, sabato=6)
+        daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato (include domenica se selezionata)
         !isHoliday(lessonDateStr); // Non festività
 
       if (isValidDay) {
@@ -307,6 +328,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
           setShowCalendarWizard(false);
           setCurrentStep(2);
         }}
+        isSubmitting={isSubmitting}
       />
     );
   }
