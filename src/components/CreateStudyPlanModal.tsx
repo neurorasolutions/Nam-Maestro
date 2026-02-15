@@ -24,11 +24,12 @@ const TEACHERS_LIST = [
 ];
 
 const CATEGORIES = [
-  'STRUMENTO',
   'CANTO',
-  'MUSICA D\'INSIEME',
-  'TEORIA E CULTURA',
-  'ALTRO',
+  'STRUMENTO',
+  'CORSI AUDIO',
+  'WEBINAR',
+  'MASTERCLASS',
+  'EVENTI',
 ];
 
 type WizardStep = 1 | 2 | 3;
