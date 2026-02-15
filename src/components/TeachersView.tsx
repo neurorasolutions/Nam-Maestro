@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Teacher } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { Search, UserPlus, Upload, Mail, Phone, BookOpen, DollarSign } from 'lucide-react';
+import { Search, UserPlus, Upload, Mail, Phone, BookOpen, DollarSign, Edit2, Save, X as XIcon } from 'lucide-react';
 
 const TeachersView: React.FC = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -157,30 +157,111 @@ const TeachersView: React.FC = () => {
   );
 
   const TeacherDetailModal = () => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedTeacher, setEditedTeacher] = useState<Teacher | null>(null);
+    const [saving, setSaving] = useState(false);
+
     if (!selectedTeacher) return null;
 
+    const teacherToShow = isEditing && editedTeacher ? editedTeacher : selectedTeacher;
+
+    const handleEdit = () => {
+      setEditedTeacher({ ...selectedTeacher });
+      setIsEditing(true);
+    };
+
+    const handleCancel = () => {
+      setEditedTeacher(null);
+      setIsEditing(false);
+    };
+
+    const handleSave = async () => {
+      if (!editedTeacher) return;
+
+      setSaving(true);
+      try {
+        const { error } = await supabase
+          .from('teachers')
+          .update(editedTeacher)
+          .eq('id', editedTeacher.id);
+
+        if (error) throw error;
+
+        alert('✅ Docente aggiornato con successo!');
+        setSelectedTeacher(editedTeacher);
+        setIsEditing(false);
+        fetchTeachers(); // Refresh lista
+      } catch (error: any) {
+        console.error('Errore salvataggio:', error);
+        alert('❌ Errore durante il salvataggio: ' + error.message);
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const handleChange = (field: keyof Teacher, value: any) => {
+      if (!editedTeacher) return;
+      setEditedTeacher({ ...editedTeacher, [field]: value });
+    };
+
+    const handleClickOutside = (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        setSelectedTeacher(null);
+        setIsEditing(false);
+      }
+    };
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        onClick={handleClickOutside}
+      >
+        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="sticky top-0 bg-blue-600 text-white p-6 rounded-t-lg">
             <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {selectedTeacher.first_name} {selectedTeacher.last_name}
-                </h2>
-                {selectedTeacher.subjects_taught && (
-                  <p className="text-blue-100 text-sm mt-1">
-                    {selectedTeacher.subjects_taught.split(',').slice(0, 3).join(' • ')}
-                    {selectedTeacher.subjects_taught.split(',').length > 3 && '...'}
-                  </p>
+              <div className="flex-1">
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={teacherToShow.first_name}
+                        onChange={(e) => handleChange('first_name', e.target.value)}
+                        className="flex-1 px-3 py-2 text-gray-900 rounded"
+                        placeholder="Nome"
+                      />
+                      <input
+                        type="text"
+                        value={teacherToShow.last_name}
+                        onChange={(e) => handleChange('last_name', e.target.value)}
+                        className="flex-1 px-3 py-2 text-gray-900 rounded"
+                        placeholder="Cognome"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      {teacherToShow.first_name} {teacherToShow.last_name}
+                    </h2>
+                    {teacherToShow.subjects_taught && (
+                      <p className="text-blue-100 text-sm mt-1">
+                        {teacherToShow.subjects_taught.split(',').slice(0, 3).join(' • ')}
+                        {teacherToShow.subjects_taught.split(',').length > 3 && '...'}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <button
-                onClick={() => setSelectedTeacher(null)}
-                className="text-white hover:text-gray-200"
+                onClick={() => {
+                  setSelectedTeacher(null);
+                  setIsEditing(false);
+                }}
+                className="text-white hover:text-gray-200 ml-4"
               >
-                <i className="fas fa-times text-xl"></i>
+                <XIcon className="w-6 h-6" />
               </button>
             </div>
           </div>
@@ -190,131 +271,319 @@ const TeachersView: React.FC = () => {
             {/* Contatti */}
             <div>
               <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <i className="fas fa-address-book text-blue-600"></i>
+                <Mail className="w-5 h-5 text-blue-600" />
                 Contatti
               </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {selectedTeacher.email && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Mail className="w-4 h-4" />
-                    <a href={`mailto:${selectedTeacher.email}`} className="hover:text-blue-600">
-                      {selectedTeacher.email}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Email</label>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={teacherToShow.email || ''}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <a href={`mailto:${teacherToShow.email}`} className="text-blue-600 hover:underline">
+                      {teacherToShow.email || '-'}
                     </a>
-                  </div>
-                )}
-                {selectedTeacher.mobile_phone && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Phone className="w-4 h-4" />
-                    <a href={`tel:${selectedTeacher.mobile_phone}`} className="hover:text-blue-600">
-                      {selectedTeacher.mobile_phone}
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Cellulare</label>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={teacherToShow.mobile_phone || ''}
+                      onChange={(e) => handleChange('mobile_phone', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <a href={`tel:${teacherToShow.mobile_phone}`} className="text-blue-600 hover:underline">
+                      {teacherToShow.mobile_phone || '-'}
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Telefono</label>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={teacherToShow.phone || ''}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.phone || '-'}</div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Anagrafica */}
-            {(selectedTeacher.fiscal_code || selectedTeacher.date_of_birth || selectedTeacher.birth_place) && (
-              <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <i className="fas fa-id-card text-blue-600"></i>
-                  Anagrafica
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {selectedTeacher.fiscal_code && (
-                    <div>
-                      <span className="text-gray-500">Codice Fiscale:</span>
-                      <div className="font-medium">{selectedTeacher.fiscal_code}</div>
-                    </div>
+            <div>
+              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <i className="fas fa-id-card text-blue-600"></i>
+                Anagrafica
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Codice Fiscale</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.fiscal_code || ''}
+                      onChange={(e) => handleChange('fiscal_code', e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.fiscal_code || '-'}</div>
                   )}
-                  {selectedTeacher.date_of_birth && (
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Data di Nascita</label>
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      value={teacherToShow.date_of_birth || ''}
+                      onChange={(e) => handleChange('date_of_birth', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
                     <div>
-                      <span className="text-gray-500">Data di Nascita:</span>
-                      <div className="font-medium">
-                        {new Date(selectedTeacher.date_of_birth).toLocaleDateString('it-IT')}
-                      </div>
-                    </div>
-                  )}
-                  {selectedTeacher.birth_place && (
-                    <div>
-                      <span className="text-gray-500">Luogo di Nascita:</span>
-                      <div className="font-medium">
-                        {selectedTeacher.birth_place} ({selectedTeacher.birth_province})
-                      </div>
+                      {teacherToShow.date_of_birth
+                        ? new Date(teacherToShow.date_of_birth).toLocaleDateString('it-IT')
+                        : '-'}
                     </div>
                   )}
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Luogo di Nascita</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.birth_place || ''}
+                      onChange={(e) => handleChange('birth_place', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.birth_place || '-'}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Provincia di Nascita</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.birth_province || ''}
+                      onChange={(e) => handleChange('birth_province', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.birth_province || '-'}</div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Residenza */}
-            {selectedTeacher.address && (
-              <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <i className="fas fa-home text-blue-600"></i>
-                  Residenza
-                </h3>
-                <div className="text-sm text-gray-600">
-                  {selectedTeacher.address}<br />
-                  {selectedTeacher.zip_code} {selectedTeacher.city} ({selectedTeacher.province})
+            <div>
+              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <i className="fas fa-home text-blue-600"></i>
+                Residenza
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">Indirizzo</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.address || ''}
+                      onChange={(e) => handleChange('address', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.address || '-'}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">CAP</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.zip_code || ''}
+                      onChange={(e) => handleChange('zip_code', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.zip_code || '-'}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Città</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.city || ''}
+                      onChange={(e) => handleChange('city', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.city || '-'}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Provincia</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.province || ''}
+                      onChange={(e) => handleChange('province', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.province || '-'}</div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Dati Lavorativi */}
-            {(selectedTeacher.hourly_rate || selectedTeacher.iban || selectedTeacher.billing_mode) && (
-              <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                  Dati Lavorativi
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {selectedTeacher.hourly_rate && (
+            <div>
+              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-blue-600" />
+                Dati Lavorativi
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Tariffa Oraria (€)</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={teacherToShow.hourly_rate || ''}
+                      onChange={(e) => handleChange('hourly_rate', parseFloat(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
                     <div>
-                      <span className="text-gray-500">Tariffa Oraria:</span>
-                      <div className="font-medium">€ {selectedTeacher.hourly_rate.toFixed(2)}/ora</div>
-                    </div>
-                  )}
-                  {selectedTeacher.billing_mode && (
-                    <div>
-                      <span className="text-gray-500">Fatturazione:</span>
-                      <div className="font-medium">{selectedTeacher.billing_mode}</div>
-                    </div>
-                  )}
-                  {selectedTeacher.vat_number && (
-                    <div>
-                      <span className="text-gray-500">P. IVA:</span>
-                      <div className="font-medium">{selectedTeacher.vat_number}</div>
-                    </div>
-                  )}
-                  {selectedTeacher.iban && (
-                    <div className="col-span-2">
-                      <span className="text-gray-500">IBAN:</span>
-                      <div className="font-medium font-mono text-xs">{selectedTeacher.iban}</div>
+                      {teacherToShow.hourly_rate ? `€ ${teacherToShow.hourly_rate.toFixed(2)}/ora` : '-'}
                     </div>
                   )}
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">P. IVA</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.vat_number || ''}
+                      onChange={(e) => handleChange('vat_number', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.vat_number || '-'}</div>
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">IBAN</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.iban || ''}
+                      onChange={(e) => handleChange('iban', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded font-mono"
+                    />
+                  ) : (
+                    <div className="font-mono text-sm">{teacherToShow.iban || '-'}</div>
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">Modalità Fatturazione</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={teacherToShow.billing_mode || ''}
+                      onChange={(e) => handleChange('billing_mode', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                    />
+                  ) : (
+                    <div>{teacherToShow.billing_mode || '-'}</div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Materie Insegnate */}
-            {selectedTeacher.subjects_taught && (
-              <div>
-                <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                  Materie Insegnate
-                </h3>
+            <div>
+              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                Materie Insegnate
+              </h3>
+              {isEditing ? (
+                <textarea
+                  value={teacherToShow.subjects_taught || ''}
+                  onChange={(e) => handleChange('subjects_taught', e.target.value)}
+                  rows={3}
+                  placeholder="Materie separate da virgola (es. CHITARRA, BASSO, TEORIA MUSICALE)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded"
+                />
+              ) : (
                 <div className="flex flex-wrap gap-2">
-                  {selectedTeacher.subjects_taught.split(',').map((subject, idx) => (
-                    <span
-                      key={idx}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium"
-                    >
-                      {subject.trim()}
-                    </span>
-                  ))}
+                  {teacherToShow.subjects_taught ? (
+                    teacherToShow.subjects_taught.split(',').map((subject, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium"
+                      >
+                        {subject.trim()}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-500">-</span>
+                  )}
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer con pulsanti */}
+          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Salvataggio...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salva Modifiche
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleEdit}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                <Edit2 className="w-4 h-4" />
+                Modifica
+              </button>
             )}
           </div>
         </div>
