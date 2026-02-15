@@ -160,3 +160,34 @@ export interface StudyPlanSubject {
   created_at?: string;
   updated_at?: string;
 }
+
+// --- INTERFACCIA DOCENTI ---
+
+export interface Teacher {
+  id?: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  gender?: string;
+  date_of_birth?: string;
+  birth_place?: string;
+  birth_province?: string;
+  fiscal_code?: string;
+  passport_number?: string;
+  address?: string;
+  zip_code?: string;
+  city?: string;
+  province?: string;
+  country?: string;
+  mobile_phone?: string;
+  phone?: string;
+  iban?: string;
+  vat_number?: string;
+  hourly_rate?: number;
+  billing_mode?: string;
+  subjects_taught?: string;
+  is_active?: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}

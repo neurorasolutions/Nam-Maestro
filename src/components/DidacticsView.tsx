@@ -3,9 +3,11 @@ import { CORSI_STRUTTURA } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Student, StudyPlan, StudyPlanSubject } from '../types';
 import CreateStudyPlanModal from './CreateStudyPlanModal';
+import TeachersView from './TeachersView';
 
 // Tipo per le sottosezioni della Didattica
 type DidacticsSubSection =
+   | 'docenti'
    | 'piani_studi'
    | 'pre_iscrizioni'
    | 'corsi_collettivi'
@@ -54,6 +56,7 @@ const DidacticsView: React.FC = () => {
 
    // Menu items per la sidebar interna
    const subMenuItems: { id: DidacticsSubSection; label: string; icon: string }[] = [
+      { id: 'docenti', label: 'Docenti', icon: 'fa-chalkboard-user' },
       { id: 'piani_studi', label: 'Piani di Studi', icon: 'fa-book-open' },
       { id: 'pre_iscrizioni', label: 'Pre-iscrizioni', icon: 'fa-user-clock' },
       { id: 'corsi_collettivi', label: 'Corsi Collettivi', icon: 'fa-users' },
@@ -484,6 +487,8 @@ const DidacticsView: React.FC = () => {
    // Render del contenuto principale in base alla sottosezione attiva
    const renderContent = () => {
       switch (activeSubSection) {
+         case 'docenti':
+            return <TeachersView />;
          case 'piani_studi':
             return <PianiStudiView />;
          case 'pre_iscrizioni':

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, BookOpen, Plus, Trash2, Calendar, CheckCircle } from 'lucide-react';
-import { StudyPlan, StudyPlanSubject } from '../types';
+import { StudyPlan, StudyPlanSubject, Teacher } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import CalendarWizard from './CalendarWizard';
 
@@ -8,20 +8,6 @@ interface CreateStudyPlanModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-// Lista docenti hardcoded
-const TEACHERS_LIST = [
-  'Alessandro Rossi',
-  'Maria Bianchi',
-  'Giuseppe Verdi',
-  'Laura Neri',
-  'Marco Ferrari',
-  'Giulia Romano',
-  'Francesco Ricci',
-  'Chiara Esposito',
-  'Davide Marino',
-  'Elena Greco',
-];
 
 const CATEGORIES = [
   'CANTO',
@@ -56,6 +42,26 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
   const [errors, setErrors] = useState<string[]>([]);
 
+  // Docenti dal database
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+
+  // Fetch docenti dal database
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('id, first_name, last_name')
+        .eq('is_active', true)
+        .order('last_name');
+
+      if (!error && data) {
+        setTeachers(data);
+      }
+    };
+
+    fetchTeachers();
+  }, []);
+
   // ========== STEP 1 FUNCTIONS ==========
 
   const validateStep1 = (): boolean => {
@@ -76,12 +82,16 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
   // ========== STEP 2 FUNCTIONS ==========
 
   const addSubject = () => {
+    const firstTeacher = teachers.length > 0
+      ? `${teachers[0].first_name} ${teachers[0].last_name}`
+      : '';
+
     const newSubject: SubjectForm = {
       tempId: `temp-${Date.now()}`,
       subject_name: '',
       subject_type: 'collective',
       total_hours: 20,
-      teacher_name: TEACHERS_LIST[0],
+      teacher_name: firstTeacher,
       order_index: subjects.length,
     };
     setSubjects([...subjects, newSubject]);
@@ -488,17 +498,26 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
                         <div className="col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Docente
+                            Docente {teachers.length === 0 && <span className="text-xs text-gray-500">(caricamento...)</span>}
                           </label>
-                          <select
-                            value={subject.teacher_name}
+                          <input
+                            list={`teachers-list-${subject.tempId}`}
+                            value={subject.teacher_name || ''}
                             onChange={(e) => updateSubject(subject.tempId, 'teacher_name', e.target.value)}
+                            placeholder="Cerca e seleziona docente..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                          >
-                            {TEACHERS_LIST.map(teacher => (
-                              <option key={teacher} value={teacher}>{teacher}</option>
+                          />
+                          <datalist id={`teachers-list-${subject.tempId}`}>
+                            {teachers.map(teacher => (
+                              <option
+                                key={teacher.id}
+                                value={`${teacher.first_name} ${teacher.last_name}`}
+                              />
                             ))}
-                          </select>
+                          </datalist>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {teachers.length} docenti disponibili • Digita per cercare
+                          </p>
                         </div>
                       </div>
                     </div>
