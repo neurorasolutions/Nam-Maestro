@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Clock, MapPin, AlertCircle, Calculator } from 'lucide-react';
 import { StudyPlanSubject } from '../types';
+import { calculateEndDate, getHolidaysInRange } from '../utils/holidays';
 
 interface SubjectSchedule {
   subjectId: string;
@@ -43,6 +44,8 @@ const ROOMS = [
 export default function CalendarWizard({ subjects, onComplete, onCancel }: CalendarWizardProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [hoursPerLesson, setHoursPerLesson] = useState(2); // Ore per lezione (default 2)
+  const [autoCalculatedEndDate, setAutoCalculatedEndDate] = useState(''); // Data fine calcolata
   const [schedules, setSchedules] = useState<SubjectSchedule[]>(
     subjects.map(subject => ({
       subjectId: subject.id || '',
@@ -54,6 +57,33 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
     }))
   );
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Calcola automaticamente data fine quando cambiano i parametri
+  useEffect(() => {
+    if (startDate && schedules.length > 0) {
+      // Usa la prima materia per il calcolo (o quella con più ore)
+      const maxHoursSubject = subjects.reduce((max, current) =>
+        current.total_hours > max.total_hours ? current : max
+      );
+
+      const totalLessons = Math.ceil(maxHoursSubject.total_hours / hoursPerLesson);
+      const firstSchedule = schedules[0];
+
+      if (firstSchedule.daysOfWeek.length > 0) {
+        const calculatedDate = calculateEndDate(
+          startDate,
+          totalLessons,
+          firstSchedule.daysOfWeek
+        );
+        setAutoCalculatedEndDate(calculatedDate);
+
+        // Se endDate è vuota, proponi la data calcolata
+        if (!endDate) {
+          setEndDate(calculatedDate);
+        }
+      }
+    }
+  }, [startDate, hoursPerLesson, schedules]);
 
   const handleDayToggle = (subjectIndex: number, dayValue: number) => {
     const newSchedules = [...schedules];
@@ -113,9 +143,6 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
   const calculateEstimatedLessons = (schedule: SubjectSchedule, subject: StudyPlanSubject): number => {
     if (!startDate || !endDate || schedule.daysOfWeek.length === 0) return 0;
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const hoursPerLesson = 2; // Default
     const totalLessonsNeeded = Math.ceil(subject.total_hours / hoursPerLesson);
 
     return totalLessonsNeeded;
@@ -146,12 +173,12 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="w-5 h-5 text-blue-600" />
-              <h3 className="font-medium text-gray-900">Anno Scolastico</h3>
+              <h3 className="font-medium text-gray-900">Anno Scolastico e Durata Lezioni</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data Inizio
+                  Data Inizio *
                 </label>
                 <input
                   type="date"
@@ -162,7 +189,24 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data Fine
+                  Ore per Lezione
+                </label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="8"
+                  step="0.5"
+                  value={hoursPerLesson}
+                  onChange={(e) => setHoursPerLesson(parseFloat(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  Data Fine *
+                  {autoCalculatedEndDate && (
+                    <Calculator className="w-4 h-4 text-green-600" title="Calcolata automaticamente" />
+                  )}
                 </label>
                 <input
                   type="date"
@@ -172,6 +216,23 @@ export default function CalendarWizard({ subjects, onComplete, onCancel }: Calen
                 />
               </div>
             </div>
+            {autoCalculatedEndDate && (
+              <div className="bg-green-50 border border-green-200 rounded p-2 text-sm">
+                <span className="text-green-700 font-medium">💡 Suggerimento:</span>
+                <span className="text-green-600 ml-1">
+                  Data fine calcolata: {new Date(autoCalculatedEndDate).toLocaleDateString('it-IT')}
+                  {' '}(considerando festività e chiusure)
+                </span>
+                {endDate !== autoCalculatedEndDate && (
+                  <button
+                    onClick={() => setEndDate(autoCalculatedEndDate)}
+                    className="ml-2 text-green-700 underline hover:text-green-800"
+                  >
+                    Usa questa data
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Errors */}

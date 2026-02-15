@@ -3,6 +3,7 @@ import { X, ChevronRight, ChevronLeft, BookOpen, Plus, Trash2, Calendar, CheckCi
 import { StudyPlan, StudyPlanSubject, Teacher } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import CalendarWizard from './CalendarWizard';
+import { isHoliday, getHolidayName } from '../utils/holidays';
 
 interface CreateStudyPlanModalProps {
   onClose: () => void;
@@ -232,13 +233,21 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
     let currentDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
     let lessonsCreated = 0;
+    let iterations = 0;
+    const maxIterations = 1000; // Safety limit per evitare loop infiniti
 
-    while (lessonsCreated < totalLessonsNeeded && currentDate <= endDate) {
+    while (lessonsCreated < totalLessonsNeeded && currentDate <= endDate && iterations < maxIterations) {
+      iterations++;
       const dayOfWeek = currentDate.getDay();
+      const lessonDateStr = currentDate.toISOString().split('T')[0];
 
-      if (daysOfWeek.includes(dayOfWeek)) {
-        const lessonDateStr = currentDate.toISOString().split('T')[0];
+      // Verifica se è un giorno valido per la lezione
+      const isValidDay =
+        daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato
+        dayOfWeek !== 0 && dayOfWeek !== 6 && // Non weekend (domenica=0, sabato=6)
+        !isHoliday(lessonDateStr); // Non festività
 
+      if (isValidDay) {
         lessons.push({
           course_name: courseName,
           title: subjectName,
@@ -257,6 +266,8 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
       // Avanza di 1 giorno
       currentDate.setDate(currentDate.getDate() + 1);
     }
+
+    console.log(`🎓 Generate ${lessonsCreated} lezioni per ${subjectName} (saltate festività)`);
 
     return lessons;
   };
