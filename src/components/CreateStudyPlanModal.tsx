@@ -278,7 +278,6 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
           start_time: startTime,
           end_time: endTime,
           type: subjectType === 'collective' ? 'collective' : 'lesson',
-          status: 'scheduled',
         });
 
         lessonsCreated++;
