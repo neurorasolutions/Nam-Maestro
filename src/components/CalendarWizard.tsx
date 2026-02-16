@@ -60,6 +60,20 @@ export default function CalendarWizard({ subjects, onComplete, onCancel, isSubmi
   );
   const [errors, setErrors] = useState<string[]>([]);
 
+  // Seleziona automaticamente il giorno della settimana quando cambia la data di inizio
+  useEffect(() => {
+    if (startDate && schedules.length > 0) {
+      const startDay = new Date(startDate).getDay();
+
+      // Se la prima materia non ha giorni selezionati, seleziona automaticamente il giorno della data di inizio
+      const newSchedules = [...schedules];
+      if (newSchedules[0].daysOfWeek.length === 0) {
+        newSchedules[0].daysOfWeek = [startDay];
+        setSchedules(newSchedules);
+      }
+    }
+  }, [startDate]);
+
   // Calcola automaticamente data fine quando cambiano i parametri
   useEffect(() => {
     if (startDate && schedules.length > 0) {

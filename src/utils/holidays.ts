@@ -245,7 +245,7 @@ export function getNextWorkingDay(dateStr: string): string {
  * Calcola data fine corso considerando festività
  * @param startDate Data inizio (YYYY-MM-DD)
  * @param totalLessons Numero totale lezioni
- * @param daysOfWeek Giorni settimana (1=lun, 2=mar, ..., 6=sab)
+ * @param daysOfWeek Giorni settimana (0=dom, 1=lun, 2=mar, ..., 6=sab)
  * @returns Data fine stimata (YYYY-MM-DD)
  */
 export function calculateEndDate(
@@ -253,6 +253,7 @@ export function calculateEndDate(
   totalLessons: number,
   daysOfWeek: number[]
 ): string {
+  const startDayOfWeek = new Date(startDate).getDay();
   let currentDate = new Date(startDate);
   let lessonsScheduled = 0;
   let iterations = 0;
@@ -265,8 +266,7 @@ export function calculateEndDate(
 
     // Verifica se è un giorno valido
     if (
-      daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato
-      dayOfWeek !== 0 && dayOfWeek !== 6 && // Non weekend
+      daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato (include domenica se selezionata)
       !isHoliday(dateStr) // Non festività
     ) {
       lessonsScheduled++;
@@ -274,6 +274,18 @@ export function calculateEndDate(
 
     // Avanza al giorno successivo
     currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  // Retrocedi di 1 giorno perché siamo avanzati dopo l'ultima lezione
+  currentDate.setDate(currentDate.getDate() - 1);
+
+  // IMPORTANTE: Assicurati che la data finale sia lo stesso giorno della settimana della data di inizio
+  const finalDayOfWeek = currentDate.getDay();
+  if (finalDayOfWeek !== startDayOfWeek) {
+    // Avanza fino al prossimo giorno che corrisponde al giorno di inizio
+    let daysToAdd = (startDayOfWeek - finalDayOfWeek + 7) % 7;
+    if (daysToAdd === 0) daysToAdd = 7; // Se già lo stesso giorno, vai alla prossima settimana
+    currentDate.setDate(currentDate.getDate() + daysToAdd);
   }
 
   return formatDate(currentDate);
