@@ -157,6 +157,7 @@ const DidacticsView: React.FC = () => {
                description: planToEdit.description,
                category: planToEdit.category,
                subcategory: planToEdit.subcategory,
+               price: planToEdit.price || null,
             })
             .eq('id', planToEdit.id);
 
@@ -845,7 +846,7 @@ const DidacticsView: React.FC = () => {
                            {/* Info Piano */}
                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                               <h3 className="font-semibold text-gray-800 mb-3">Informazioni Piano</h3>
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-3 gap-4 mb-4">
                                  <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Nome Piano</label>
                                     <input
@@ -867,15 +868,26 @@ const DidacticsView: React.FC = () => {
                                        ))}
                                     </select>
                                  </div>
-                                 <div className="col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione (opzionale)</label>
-                                    <textarea
-                                       value={planToEdit.description || ''}
-                                       onChange={(e) => setPlanToEdit({ ...planToEdit, description: e.target.value })}
-                                       rows={2}
+                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Costo (€)</label>
+                                    <input
+                                       type="number"
+                                       min="0"
+                                       step="0.01"
+                                       value={planToEdit.price || 0}
+                                       onChange={(e) => setPlanToEdit({ ...planToEdit, price: parseFloat(e.target.value) || 0 })}
                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                     />
                                  </div>
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione (opzionale)</label>
+                                 <textarea
+                                    value={planToEdit.description || ''}
+                                    onChange={(e) => setPlanToEdit({ ...planToEdit, description: e.target.value })}
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                 />
                               </div>
                            </div>
 

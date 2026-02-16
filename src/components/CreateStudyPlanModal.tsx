@@ -35,6 +35,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
   const [planDescription, setPlanDescription] = useState('');
   const [planCategory, setPlanCategory] = useState(CATEGORIES[0]);
   const [planSubcategory, setPlanSubcategory] = useState('');
+  const [planPrice, setPlanPrice] = useState<number>(0);
 
   // Step 2: Materie
   const [subjects, setSubjects] = useState<SubjectForm[]>([]);
@@ -147,6 +148,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
           description: planDescription,
           category: planCategory,
           subcategory: planSubcategory || null,
+          price: planPrice > 0 ? planPrice : null,
           is_active: true,
         })
         .select()
@@ -425,6 +427,21 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
                   value={planSubcategory}
                   onChange={(e) => setPlanSubcategory(e.target.value)}
                   placeholder="es. Livello Avanzato, Biennio, ecc."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Costo del Corso (€)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={planPrice}
+                  onChange={(e) => setPlanPrice(parseFloat(e.target.value) || 0)}
+                  placeholder="es. 1500.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 />
               </div>

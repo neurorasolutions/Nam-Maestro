@@ -140,6 +140,7 @@ export interface StudyPlan {
   description?: string;
   category: string;
   subcategory?: string;
+  price?: number;
   is_active?: boolean;
   total_hours?: number;
   total_individual_hours?: number;
