@@ -191,23 +191,25 @@ const DidacticsView: React.FC = () => {
                   <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                   <input
                      type="text"
-                     placeholder="Cerca categoria..."
+                     placeholder="Cerca categoria o piano di studio..."
                      value={searchTerm}
                      onChange={(e) => setSearchTerm(e.target.value)}
                      className="w-full pl-10 p-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500"
                   />
                </div>
                <span className="text-sm text-gray-500">
-                  {Object.keys(CORSI_STRUTTURA).length} macro-categorie
+                  {studyPlans.length} piani di studio creati
                </span>
             </div>
 
             {/* Macro-Categorie - Layout Verticale/Griglia */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                {filteredCategories.map(([categoria, config]) => {
-                  const totalStudents = countTotalStudentsForCategory(categoria);
-                  const hasSubcategories = 'sottocategorie' in config;
                   const dynamicPlansCount = countDynamicPlansForCategory(categoria);
+                  const dynamicPlans = getDynamicPlansForCategory(categoria);
+                  const totalStudentsInPlans = dynamicPlans.reduce((acc, plan) => {
+                     return acc + students.filter(s => s.study_plan_id === plan.id).length;
+                  }, 0);
 
                   return (
                      <button
@@ -223,13 +225,12 @@ const DidacticsView: React.FC = () => {
                               <div className="flex-1 min-w-0">
                                  <h3 className="font-bold text-gray-800 text-lg leading-tight">{categoria}</h3>
                                  <p className="text-xs text-gray-500 mt-1">
-                                    {hasSubcategories
-                                       ? `${Object.keys(config.sottocategorie).length} strumenti`
-                                       : `${config.corsi.length} livelli`}
-                                    {dynamicPlansCount > 0 && (
-                                       <span className="text-blue-600 font-semibold ml-1">
-                                          • {dynamicPlansCount} personalizzati
+                                    {dynamicPlansCount > 0 ? (
+                                       <span className="text-blue-600 font-semibold">
+                                          {dynamicPlansCount} {dynamicPlansCount === 1 ? 'piano' : 'piani'}
                                        </span>
+                                    ) : (
+                                       <span className="text-gray-400">Nessun piano creato</span>
                                     )}
                                  </p>
                               </div>
@@ -237,8 +238,8 @@ const DidacticsView: React.FC = () => {
 
                            <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                               <span className="text-xs text-gray-500">Iscritti</span>
-                              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                                 {totalStudents > 0 ? totalStudents : 0}
+                              <span className={`px-3 py-1 rounded-full text-sm font-bold ${totalStudentsInPlans > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                 {totalStudentsInPlans}
                               </span>
                            </div>
                         </div>
@@ -260,9 +261,7 @@ const DidacticsView: React.FC = () => {
                            <div>
                               <h2 className="text-2xl font-bold">{selectedCategoryModal}</h2>
                               <p className="text-white text-opacity-80 text-sm mt-1">
-                                 {'sottocategorie' in selectedConfig
-                                    ? `${Object.keys(selectedConfig.sottocategorie).length} strumenti • ${countTotalStudentsForCategory(selectedCategoryModal)} iscritti`
-                                    : `${selectedConfig.corsi.length} livelli • ${countTotalStudentsForCategory(selectedCategoryModal)} iscritti`}
+                                 {getDynamicPlansForCategory(selectedCategoryModal).length} {getDynamicPlansForCategory(selectedCategoryModal).length === 1 ? 'piano' : 'piani'} di studio
                               </p>
                            </div>
                         </div>
@@ -276,90 +275,12 @@ const DidacticsView: React.FC = () => {
 
                      {/* Contenuto Modal */}
                      <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                        {'sottocategorie' in selectedConfig ? (
-                           // Sottocategorie (es. Strumenti)
-                           <div className="space-y-6">
-                              {Object.entries(selectedConfig.sottocategorie).map(([sottoCat, corsi]) => (
-                                 <div key={sottoCat} className="bg-gray-50 rounded-xl p-5">
-                                    <h4 className="font-bold text-gray-800 text-lg mb-4 flex items-center gap-2">
-                                       <span className={`w-2 h-2 ${selectedConfig.color} rounded-full`}></span>
-                                       {sottoCat}
-                                       <span className="text-sm text-gray-500 font-normal">({corsi.length} livelli)</span>
-                                    </h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                       {corsi.map((corso) => {
-                                          const studentiCorso = getStudentsForCourse(selectedCategoryModal, corso, sottoCat);
-                                          return (
-                                             <div key={corso} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                                                <div className="flex items-center justify-between mb-2">
-                                                   <span className="text-sm font-semibold text-gray-700">{corso}</span>
-                                                   <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                      {studentiCorso.length}
-                                                   </span>
-                                                </div>
-                                                {studentiCorso.length > 0 && (
-                                                   <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-100">
-                                                      {studentiCorso.slice(0, 3).map(s => (
-                                                         <span key={s.id} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                                            {s.first_name} {s.last_name?.[0]}.
-                                                         </span>
-                                                      ))}
-                                                      {studentiCorso.length > 3 && (
-                                                         <span className="text-xs text-gray-500 px-2 py-1">
-                                                            +{studentiCorso.length - 3}
-                                                         </span>
-                                                      )}
-                                                   </div>
-                                                )}
-                                             </div>
-                                          );
-                                       })}
-                                    </div>
-                                 </div>
-                              ))}
-                           </div>
-                        ) : (
-                           // Corsi diretti (senza sottocategorie)
-                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {selectedConfig.corsi.map((corso) => {
-                                 const studentiCorso = getStudentsForCourse(selectedCategoryModal, corso);
-                                 return (
-                                    <div key={corso} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                                       <div className="flex items-center justify-between mb-2">
-                                          <span className="font-semibold text-gray-800">{corso}</span>
-                                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiCorso.length > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                                             {studentiCorso.length}
-                                          </span>
-                                       </div>
-                                       {studentiCorso.length > 0 && (
-                                          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-200">
-                                             {studentiCorso.slice(0, 5).map(s => (
-                                                <span key={s.id} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
-                                                   {s.first_name} {s.last_name?.[0]}.
-                                                </span>
-                                             ))}
-                                             {studentiCorso.length > 5 && (
-                                                <span className="text-xs text-gray-500 px-2 py-1">
-                                                   +{studentiCorso.length - 5} altri
-                                                </span>
-                                             )}
-                                          </div>
-                                       )}
-                                    </div>
-                                 );
-                              })}
-                           </div>
-                        )}
-
-                        {/* Piani Personalizzati - Creati dal Database */}
-                        {selectedCategoryModal && getDynamicPlansForCategory(selectedCategoryModal).length > 0 && (
-                           <div className="mt-8 pt-6 border-t-2 border-gray-200">
+                        {/* Piani di Studio */}
+                        {selectedCategoryModal && getDynamicPlansForCategory(selectedCategoryModal).length > 0 ? (
+                           <div>
                               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                 <i className="fas fa-layer-group text-blue-600"></i>
-                                 Piani Personalizzati
-                                 <span className="text-sm text-gray-500 font-normal">
-                                    ({getDynamicPlansForCategory(selectedCategoryModal).length})
-                                 </span>
+                                 <i className="fas fa-graduation-cap text-blue-600"></i>
+                                 Piani di Studio
                               </h3>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                  {getDynamicPlansForCategory(selectedCategoryModal).map((plan) => {
@@ -418,6 +339,12 @@ const DidacticsView: React.FC = () => {
                                     );
                                  })}
                               </div>
+                           </div>
+                        ) : (
+                           <div className="text-center py-12">
+                              <i className="fas fa-folder-open text-gray-300 text-5xl mb-4"></i>
+                              <p className="text-gray-500 text-lg font-medium">Nessun piano di studio in questa categoria</p>
+                              <p className="text-gray-400 text-sm mt-2">Clicca su "Crea Piano di Studio" per aggiungerne uno</p>
                            </div>
                         )}
                      </div>
