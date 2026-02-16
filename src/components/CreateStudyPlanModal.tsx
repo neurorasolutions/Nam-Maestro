@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, BookOpen, Plus, Trash2, Calendar, CheckCircle } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, BookOpen, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { StudyPlan, StudyPlanSubject, Teacher } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import CalendarWizard from './CalendarWizard';
-import { isHoliday, getHolidayName } from '../utils/holidays';
 
 interface CreateStudyPlanModalProps {
   onClose: () => void;
@@ -19,7 +17,7 @@ const CATEGORIES = [
   'EVENTI',
 ];
 
-type WizardStep = 1 | 2 | 3;
+type WizardStep = 1 | 2;
 
 interface SubjectForm extends Omit<StudyPlanSubject, 'id' | 'study_plan_id' | 'created_at' | 'updated_at'> {
   tempId: string; // ID temporaneo per gestione UI
@@ -39,9 +37,6 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
   // Step 2: Materie
   const [subjects, setSubjects] = useState<SubjectForm[]>([]);
-
-  // Step 3: Calendarizzazione
-  const [showCalendarWizard, setShowCalendarWizard] = useState(false);
 
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -85,16 +80,12 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
   // ========== STEP 2 FUNCTIONS ==========
 
   const addSubject = () => {
-    const firstTeacher = teachers.length > 0
-      ? `${teachers[0].first_name} ${teachers[0].last_name}`
-      : '';
-
     const newSubject: SubjectForm = {
       tempId: `temp-${Date.now()}`,
       subject_name: '',
       subject_type: 'collective',
       total_hours: 20,
-      teacher_name: firstTeacher,
+      teacher_name: '', // Ora opzionale
       order_index: subjects.length,
       teacherSelectMode: 'list', // Default: selezione da lista
     };
@@ -133,12 +124,12 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
   // ========== STEP 3 FUNCTIONS (Calendarizzazione) ==========
 
-  const handleCalendarComplete = async (schedules: any[], startDate: string, endDate: string, hoursPerLesson: number) => {
+  const handleSaveWithoutCalendar = async () => {
     setIsSubmitting(true);
     setErrors([]);
 
     try {
-      console.log('🚀 Inizio creazione piano di studio:', planName);
+      console.log('🚀 Inizio creazione piano di studio (senza calendario):', planName);
 
       // 1. Crea il piano di studio
       const { data: newPlan, error: planError } = await supabase
@@ -166,7 +157,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
         subject_name: subject.subject_name,
         subject_type: subject.subject_type,
         total_hours: subject.total_hours,
-        teacher_name: subject.teacher_name,
+        teacher_name: subject.teacher_name || null,
         order_index: idx,
       }));
 
@@ -181,48 +172,8 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
       }
       console.log(`✅ Materie inserite: ${insertedSubjects.length}`);
 
-      // 3. Genera lezioni ricorrenti
-      const lessonsToInsert: any[] = [];
-
-      for (let i = 0; i < schedules.length; i++) {
-        const schedule = schedules[i];
-        const subject = subjects[i];
-        const insertedSubject = insertedSubjects[i];
-
-        const lessons = generateRecurringLessons(
-          newPlan.name,
-          insertedSubject.subject_name,
-          insertedSubject.teacher_name || '',
-          insertedSubject.subject_type,
-          subject.total_hours,
-          schedule.daysOfWeek,
-          schedule.startTime,
-          schedule.endTime,
-          schedule.room,
-          startDate,
-          endDate,
-          hoursPerLesson
-        );
-
-        lessonsToInsert.push(...lessons);
-      }
-
-      console.log(`📅 Lezioni totali da inserire: ${lessonsToInsert.length}`);
-
-      if (lessonsToInsert.length > 0) {
-        const { error: lessonsError } = await supabase
-          .from('lessons')
-          .insert(lessonsToInsert);
-
-        if (lessonsError) {
-          console.error('❌ Errore inserimento lezioni:', lessonsError);
-          throw lessonsError;
-        }
-        console.log('✅ Lezioni inserite nel calendario');
-      }
-
       // Successo!
-      alert(`✅ Piano di studio "${planName}" creato con successo!\n\n📚 Materie: ${insertedSubjects.length}\n📅 Lezioni generate: ${lessonsToInsert.length}`);
+      alert(`✅ Piano di studio "${planName}" creato con successo!\n\n📚 Materie: ${insertedSubjects.length}\n\n💡 Potrai generare il calendario in seguito dalla modifica del piano.`);
 
       onSuccess();
       onClose();
@@ -230,68 +181,10 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
       console.error('❌ ERRORE COMPLETO:', error);
       const errorMessage = error.message || 'Errore durante la creazione del piano di studio';
       setErrors([errorMessage]);
-      setShowCalendarWizard(false); // Torna al modal per mostrare l'errore
       alert(`❌ Errore durante la creazione del piano:\n\n${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const generateRecurringLessons = (
-    courseName: string,
-    subjectName: string,
-    teacherName: string,
-    subjectType: string,
-    totalHours: number,
-    daysOfWeek: number[],
-    startTime: string,
-    endTime: string,
-    room: string,
-    startDateStr: string,
-    endDateStr: string,
-    hoursPerLesson: number
-  ): any[] => {
-    const lessons: any[] = [];
-    const totalLessonsNeeded = Math.ceil(totalHours / hoursPerLesson);
-
-    let currentDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    let lessonsCreated = 0;
-    let iterations = 0;
-    const maxIterations = 1000; // Safety limit per evitare loop infiniti
-
-    while (lessonsCreated < totalLessonsNeeded && currentDate <= endDate && iterations < maxIterations) {
-      iterations++;
-      const dayOfWeek = currentDate.getDay();
-      const lessonDateStr = currentDate.toISOString().split('T')[0];
-
-      // Verifica se è un giorno valido per la lezione
-      const isValidDay =
-        daysOfWeek.includes(dayOfWeek) && // Giorno settimana selezionato (include domenica se selezionata)
-        !isHoliday(lessonDateStr); // Non festività
-
-      if (isValidDay) {
-        lessons.push({
-          course_name: courseName,
-          title: subjectName,
-          teacher_name: teacherName,
-          room: room,
-          lesson_date: lessonDateStr,
-          start_time: startTime,
-          end_time: endTime,
-          is_hybrid: false,
-        });
-
-        lessonsCreated++;
-      }
-
-      // Avanza di 1 giorno
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    console.log(`🎓 Generate ${lessonsCreated} lezioni per ${subjectName} (saltate festività)`);
-
-    return lessons;
   };
 
   // ========== NAVIGATION ==========
@@ -301,9 +194,8 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
       setCurrentStep(2);
       setErrors([]);
     } else if (currentStep === 2 && validateStep2()) {
-      setCurrentStep(3);
-      setShowCalendarWizard(true);
-      setErrors([]);
+      // Salva direttamente il piano senza calendario
+      handleSaveWithoutCalendar();
     }
   };
 
@@ -316,24 +208,6 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
   // ========== RENDER ==========
 
-  if (showCalendarWizard) {
-    return (
-      <CalendarWizard
-        subjects={subjects.map(s => ({
-          ...s,
-          id: s.tempId,
-          study_plan_id: 'temp',
-        }))}
-        onComplete={handleCalendarComplete}
-        onCancel={() => {
-          setShowCalendarWizard(false);
-          setCurrentStep(2);
-        }}
-        isSubmitting={isSubmitting}
-      />
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -343,7 +217,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Crea Piano di Studio</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Step {currentStep} di 3
+                Step {currentStep} di 2
               </p>
             </div>
             <button
@@ -357,7 +231,7 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
 
           {/* Progress Bar */}
           <div className="mt-4 flex gap-2">
-            {[1, 2, 3].map(step => (
+            {[1, 2].map(step => (
               <div
                 key={step}
                 className={`flex-1 h-2 rounded-full ${
@@ -492,8 +366,9 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {subjects.map((subject, idx) => (
+                <>
+                  <div className="space-y-4">
+                    {subjects.map((subject, idx) => (
                     <div key={subject.tempId} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex justify-between items-start mb-3">
                         <h4 className="font-medium text-gray-900">Materia {idx + 1}</h4>
@@ -646,8 +521,19 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
+                  {/* Pulsante Aggiungi in Basso */}
+                  <button
+                    type="button"
+                    onClick={addSubject}
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span className="font-medium">Aggiungi Altra Materia</span>
+                  </button>
+                </>
               )}
 
               {/* Summary */}
@@ -677,28 +563,6 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
             </div>
           )}
 
-          {/* STEP 3: Calendarizzazione */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-blue-600 mb-4">
-                <Calendar className="w-5 h-5" />
-                <h3 className="text-lg font-medium">Calendarizzazione</h3>
-              </div>
-
-              <div className="text-center py-12 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
-                <CheckCircle className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-                <h4 className="text-lg font-medium text-gray-900 mb-2">
-                  Pronto per la Calendarizzazione
-                </h4>
-                <p className="text-gray-600 mb-4">
-                  Configura orari e giorni per generare automaticamente le lezioni del piano "{planName}"
-                </p>
-                <p className="text-sm text-gray-500 mb-6">
-                  {subjects.length} materie • {subjects.reduce((sum, s) => sum + s.total_hours, 0)} ore totali
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -719,8 +583,22 @@ export default function CreateStudyPlanModal({ onClose, onSuccess }: CreateStudy
             disabled={isSubmitting}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {currentStep === 3 ? 'Configura Calendario' : 'Avanti'}
-            <ChevronRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Creazione...
+              </>
+            ) : currentStep === 2 ? (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                Crea Piano di Studio
+              </>
+            ) : (
+              <>
+                Avanti
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

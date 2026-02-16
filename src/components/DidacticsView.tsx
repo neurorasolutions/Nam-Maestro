@@ -42,6 +42,7 @@ const DidacticsView: React.FC = () => {
    const [planDetailView, setPlanDetailView] = useState<StudyPlan | null>(null);
    const [planDetailSubjects, setPlanDetailSubjects] = useState<StudyPlanSubject[]>([]);
    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+   const [showCalendarWizardForEdit, setShowCalendarWizardForEdit] = useState(false);
 
    // Carica studenti
    useEffect(() => {
@@ -164,7 +165,7 @@ const DidacticsView: React.FC = () => {
       setEditSubjects(updated);
    };
 
-   const handleSaveEdit = async () => {
+   const handleSaveEdit = async (skipCalendarPrompt: boolean = false) => {
       if (!planToEdit) return;
 
       setIsSaving(true);
@@ -217,12 +218,17 @@ const DidacticsView: React.FC = () => {
          alert(`✅ Piano "${planToEdit.name}" modificato con successo!`);
          await fetchStudyPlans();
 
-         // Chiedi se vuole rigenerare il calendario
-         setSavedPlanForCalendar(planToEdit);
-         setSavedSubjectsForCalendar(insertedSubjects);
-         setPlanToEdit(null);
-         setEditSubjects([]);
-         setShowRegenerateCalendar(true);
+         // Chiedi se vuole rigenerare il calendario (solo se non stiamo aprendo il wizard direttamente)
+         if (!skipCalendarPrompt) {
+            setSavedPlanForCalendar(planToEdit);
+            setSavedSubjectsForCalendar(insertedSubjects);
+            setPlanToEdit(null);
+            setEditSubjects([]);
+            setShowRegenerateCalendar(true);
+         } else {
+            setPlanToEdit(null);
+            setEditSubjects([]);
+         }
       } catch (error: any) {
          console.error('Errore salvataggio modifiche:', error);
          alert(`❌ Errore durante il salvataggio: ${error.message}`);
@@ -231,7 +237,72 @@ const DidacticsView: React.FC = () => {
       }
    };
 
-   const handleRegenerateCalendar = async (schedules: any[], startDate: string, endDate: string, hoursPerLesson: number) => {
+   const handleOpenCalendarWizardForEdit = async () => {
+      if (!planToEdit) return;
+
+      // Prima salva le modifiche
+      setIsSaving(true);
+      try {
+         // 1. Aggiorna info piano
+         const { error: planError } = await supabase
+            .from('study_plans')
+            .update({
+               name: planToEdit.name,
+               description: planToEdit.description,
+               category: planToEdit.category,
+               subcategory: planToEdit.subcategory,
+               price: planToEdit.price || null,
+            })
+            .eq('id', planToEdit.id);
+
+         if (planError) throw planError;
+
+         // 2. Elimina tutte le materie esistenti
+         const { error: deleteError } = await supabase
+            .from('study_plan_subjects')
+            .delete()
+            .eq('study_plan_id', planToEdit.id);
+
+         if (deleteError) throw deleteError;
+
+         // 3. Inserisci materie aggiornate
+         const validSubjects = editSubjects
+            .filter(s => s.subject_name.trim() !== '')
+            .map((s, idx) => ({
+               study_plan_id: planToEdit.id,
+               subject_name: s.subject_name,
+               subject_type: s.subject_type,
+               total_hours: s.total_hours,
+               teacher_name: s.teacher_name || null,
+               order_index: idx,
+            }));
+
+         let insertedSubjects: StudyPlanSubject[] = [];
+         if (validSubjects.length > 0) {
+            const { data, error: insertError } = await supabase
+               .from('study_plan_subjects')
+               .insert(validSubjects)
+               .select();
+
+            if (insertError) throw insertError;
+            insertedSubjects = data || [];
+         }
+
+         // Ora apri il CalendarWizard
+         setSavedPlanForCalendar(planToEdit);
+         setSavedSubjectsForCalendar(insertedSubjects);
+         setPlanToEdit(null);
+         setEditSubjects([]);
+         setShowCalendarWizardForEdit(true);
+      } catch (error: any) {
+         console.error('Errore salvataggio modifiche:', error);
+         alert(`❌ Errore durante il salvataggio: ${error.message}`);
+      } finally {
+         setIsSaving(false);
+      }
+   };
+
+   const handleRegenerateCalendar = async (schedules: any[]) => {
       if (!savedPlanForCalendar) return;
 
       try {
@@ -243,7 +314,7 @@ const DidacticsView: React.FC = () => {
 
          if (deleteError) throw deleteError;
 
-         // 2. Genera nuove lezioni (stesso codice di CreateStudyPlanModal)
+         // 2. Genera nuove lezioni usando i dati individuali per ogni materia
          const lessonsToInsert: any[] = [];
 
          for (let i = 0; i < schedules.length; i++) {
@@ -252,9 +323,9 @@ const DidacticsView: React.FC = () => {
 
             if (!subject) continue;
 
-            const totalLessonsNeeded = Math.ceil(subject.total_hours / hoursPerLesson);
-            let currentDate = new Date(startDate);
-            const endDateObj = new Date(endDate);
+            const totalLessonsNeeded = Math.ceil(subject.total_hours / schedule.hoursPerLesson);
+            let currentDate = new Date(schedule.startDate);
+            const endDateObj = new Date(schedule.endDate);
             let lessonsCreated = 0;
             let iterations = 0;
             const maxIterations = 1000;
@@ -919,13 +990,24 @@ const DidacticsView: React.FC = () => {
                            <div className="mb-6">
                               <div className="flex items-center justify-between mb-4">
                                  <h3 className="font-semibold text-gray-800">Materie del Piano</h3>
-                                 <button
-                                    onClick={handleAddSubject}
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                                 >
-                                    <Plus className="w-4 h-4" />
-                                    Aggiungi Materia
-                                 </button>
+                                 <div className="flex gap-2">
+                                    <button
+                                       onClick={handleOpenCalendarWizardForEdit}
+                                       disabled={isSaving || isLoadingSubjects || editSubjects.filter(s => s.subject_name.trim()).length === 0}
+                                       className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                       title={editSubjects.filter(s => s.subject_name.trim()).length === 0 ? "Aggiungi almeno una materia prima di generare il calendario" : ""}
+                                    >
+                                       <Calendar className="w-4 h-4" />
+                                       Genera/Rigenera Calendario
+                                    </button>
+                                    <button
+                                       onClick={handleAddSubject}
+                                       className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                                    >
+                                       <Plus className="w-4 h-4" />
+                                       Aggiungi Materia
+                                    </button>
+                                 </div>
                               </div>
 
                               {editSubjects.length === 0 ? (
@@ -1093,11 +1175,27 @@ const DidacticsView: React.FC = () => {
          )}
 
          {/* CalendarWizard per Rigenerazione */}
-         {!showRegenerateCalendar && savedPlanForCalendar && savedSubjectsForCalendar.length > 0 && (
+         {!showRegenerateCalendar && savedPlanForCalendar && savedSubjectsForCalendar.length > 0 && !showCalendarWizardForEdit && (
             <CalendarWizard
                subjects={savedSubjectsForCalendar}
                onComplete={handleRegenerateCalendar}
                onCancel={() => {
+                  setSavedPlanForCalendar(null);
+                  setSavedSubjectsForCalendar([]);
+               }}
+            />
+         )}
+
+         {/* CalendarWizard aperto dal modal di modifica */}
+         {showCalendarWizardForEdit && savedPlanForCalendar && savedSubjectsForCalendar.length > 0 && (
+            <CalendarWizard
+               subjects={savedSubjectsForCalendar}
+               onComplete={async (schedules: any[]) => {
+                  await handleRegenerateCalendar(schedules);
+                  setShowCalendarWizardForEdit(false);
+               }}
+               onCancel={() => {
+                  setShowCalendarWizardForEdit(false);
                   setSavedPlanForCalendar(null);
                   setSavedSubjectsForCalendar([]);
                }}
