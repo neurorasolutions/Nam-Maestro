@@ -27,6 +27,8 @@ const DidacticsView: React.FC = () => {
    // Nuovo: State per piani di studio
    const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
    const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+   const [planToDelete, setPlanToDelete] = useState<StudyPlan | null>(null);
+   const [isDeleting, setIsDeleting] = useState(false);
 
    // Carica studenti
    useEffect(() => {
@@ -51,6 +53,45 @@ const DidacticsView: React.FC = () => {
 
       if (!error && data) {
          setStudyPlans(data);
+      }
+   };
+
+   const handleDeletePlan = async (plan: StudyPlan) => {
+      setIsDeleting(true);
+      try {
+         // 1. Elimina lezioni associate (in base a course_name)
+         const { error: lessonsError } = await supabase
+            .from('lessons')
+            .delete()
+            .eq('course_name', plan.name);
+
+         if (lessonsError) throw lessonsError;
+
+         // 2. Elimina materie del piano
+         const { error: subjectsError } = await supabase
+            .from('study_plan_subjects')
+            .delete()
+            .eq('study_plan_id', plan.id);
+
+         if (subjectsError) throw subjectsError;
+
+         // 3. Elimina il piano
+         const { error: planError } = await supabase
+            .from('study_plans')
+            .delete()
+            .eq('id', plan.id);
+
+         if (planError) throw planError;
+
+         // Ricarica piani e chiudi modal
+         alert(`✅ Piano "${plan.name}" eliminato con successo`);
+         await fetchStudyPlans();
+         setPlanToDelete(null);
+      } catch (error: any) {
+         console.error('Errore eliminazione piano:', error);
+         alert(`❌ Errore durante l'eliminazione: ${error.message}`);
+      } finally {
+         setIsDeleting(false);
       }
    };
 
@@ -297,9 +338,18 @@ const DidacticsView: React.FC = () => {
                                                    <span className="text-xs text-blue-600 font-medium">{plan.subcategory}</span>
                                                 )}
                                              </div>
-                                             <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiPiano.length > 0 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-                                                {studentiPiano.length}
-                                             </span>
+                                             <div className="flex items-center gap-2">
+                                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiPiano.length > 0 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                                                   {studentiPiano.length}
+                                                </span>
+                                                <button
+                                                   onClick={() => setPlanToDelete(plan)}
+                                                   className="w-7 h-7 flex items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                                                   title="Elimina piano"
+                                                >
+                                                   <i className="fas fa-trash text-xs"></i>
+                                                </button>
+                                             </div>
                                           </div>
 
                                           {plan.description && (
@@ -564,6 +614,66 @@ const DidacticsView: React.FC = () => {
                   fetchStudyPlans();
                }}
             />
+         )}
+
+         {/* Modal Conferma Eliminazione */}
+         {planToDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+               <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                  <div className="flex items-start gap-4 mb-6">
+                     <div className="w-12 h-12 flex-shrink-0 bg-red-100 rounded-full flex items-center justify-center">
+                        <i className="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                     </div>
+                     <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                           SEI SICURO DI ELIMINARE IL CORSO?
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-1">
+                           Stai per eliminare il piano di studio:
+                        </p>
+                        <p className="text-sm font-semibold text-gray-800 mb-3">
+                           "{planToDelete.name}"
+                        </p>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                           <p className="font-medium mb-1">⚠️ Questa azione eliminerà:</p>
+                           <ul className="list-disc list-inside space-y-1 ml-2">
+                              <li>Il piano di studio dal database</li>
+                              <li>Tutte le materie associate</li>
+                              <li>Tutte le lezioni generate nel calendario</li>
+                           </ul>
+                           <p className="font-bold mt-2">Questa operazione è irreversibile!</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                     <button
+                        onClick={() => setPlanToDelete(null)}
+                        disabled={isDeleting}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                     >
+                        Annulla
+                     </button>
+                     <button
+                        onClick={() => handleDeletePlan(planToDelete)}
+                        disabled={isDeleting}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                     >
+                        {isDeleting ? (
+                           <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Eliminazione...
+                           </>
+                        ) : (
+                           <>
+                              <i className="fas fa-trash"></i>
+                              Elimina Definitivamente
+                           </>
+                        )}
+                     </button>
+                  </div>
+               </div>
+            </div>
          )}
       </div>
    );
