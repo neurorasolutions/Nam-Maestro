@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X, Trash2, AlertTriangle } from 'lucide-react';
 import { CORSI_STRUTTURA } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Student, StudyPlan, StudyPlanSubject } from '../types';
@@ -310,7 +311,7 @@ const DidacticsView: React.FC = () => {
                            onClick={() => setSelectedCategoryModal(null)}
                            className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all"
                         >
-                           <i className="fas fa-times text-xl"></i>
+                           <X className="w-6 h-6" />
                         </button>
                      </div>
 
@@ -347,7 +348,7 @@ const DidacticsView: React.FC = () => {
                                                    className="w-7 h-7 flex items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
                                                    title="Elimina piano"
                                                 >
-                                                   <i className="fas fa-trash text-xs"></i>
+                                                   <Trash2 className="w-4 h-4" />
                                                 </button>
                                              </div>
                                           </div>
@@ -622,7 +623,7 @@ const DidacticsView: React.FC = () => {
                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
                   <div className="flex items-start gap-4 mb-6">
                      <div className="w-12 h-12 flex-shrink-0 bg-red-100 rounded-full flex items-center justify-center">
-                        <i className="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                        <AlertTriangle className="w-6 h-6 text-red-600" />
                      </div>
                      <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 mb-2">
@@ -666,7 +667,7 @@ const DidacticsView: React.FC = () => {
                            </>
                         ) : (
                            <>
-                              <i className="fas fa-trash"></i>
+                              <Trash2 className="w-4 h-4" />
                               Elimina Definitivamente
                            </>
                         )}
