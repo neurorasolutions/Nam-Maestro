@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, AlertTriangle, Pencil, Plus, Save } from 'lucide-react';
+import { X, Trash2, AlertTriangle, Pencil, Plus, Save, RefreshCw, Calendar } from 'lucide-react';
 import { CORSI_STRUTTURA } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Student, StudyPlan, StudyPlanSubject } from '../types';
 import CreateStudyPlanModal from './CreateStudyPlanModal';
+import CalendarWizard from './CalendarWizard';
 import TeachersView from './TeachersView';
+import { isHoliday } from '../utils/holidays';
 
 // Tipo per le sottosezioni della Didattica
 type DidacticsSubSection =
@@ -34,6 +36,9 @@ const DidacticsView: React.FC = () => {
    const [editSubjects, setEditSubjects] = useState<StudyPlanSubject[]>([]);
    const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
    const [isSaving, setIsSaving] = useState(false);
+   const [showRegenerateCalendar, setShowRegenerateCalendar] = useState(false);
+   const [savedPlanForCalendar, setSavedPlanForCalendar] = useState<StudyPlan | null>(null);
+   const [savedSubjectsForCalendar, setSavedSubjectsForCalendar] = useState<StudyPlanSubject[]>([]);
 
    // Carica studenti
    useEffect(() => {
@@ -177,18 +182,26 @@ const DidacticsView: React.FC = () => {
                order_index: idx,
             }));
 
+         let insertedSubjects: StudyPlanSubject[] = [];
          if (validSubjects.length > 0) {
-            const { error: insertError } = await supabase
+            const { data, error: insertError } = await supabase
                .from('study_plan_subjects')
-               .insert(validSubjects);
+               .insert(validSubjects)
+               .select();
 
             if (insertError) throw insertError;
+            insertedSubjects = data || [];
          }
 
          alert(`✅ Piano "${planToEdit.name}" modificato con successo!`);
          await fetchStudyPlans();
+
+         // Chiedi se vuole rigenerare il calendario
+         setSavedPlanForCalendar(planToEdit);
+         setSavedSubjectsForCalendar(insertedSubjects);
          setPlanToEdit(null);
          setEditSubjects([]);
+         setShowRegenerateCalendar(true);
       } catch (error: any) {
          console.error('Errore salvataggio modifiche:', error);
          alert(`❌ Errore durante il salvataggio: ${error.message}`);
@@ -196,6 +209,80 @@ const DidacticsView: React.FC = () => {
          setIsSaving(false);
       }
    };
+
+   const handleRegenerateCalendar = async (schedules: any[], startDate: string, endDate: string, hoursPerLesson: number) => {
+      if (!savedPlanForCalendar) return;
+
+      try {
+         // 1. Elimina tutte le lezioni esistenti per questo piano
+         const { error: deleteError } = await supabase
+            .from('lessons')
+            .delete()
+            .eq('course_name', savedPlanForCalendar.name);
+
+         if (deleteError) throw deleteError;
+
+         // 2. Genera nuove lezioni (stesso codice di CreateStudyPlanModal)
+         const lessonsToInsert: any[] = [];
+
+         for (let i = 0; i < schedules.length; i++) {
+            const schedule = schedules[i];
+            const subject = savedSubjectsForCalendar[i];
+
+            if (!subject) continue;
+
+            const totalLessonsNeeded = Math.ceil(subject.total_hours / hoursPerLesson);
+            let currentDate = new Date(startDate);
+            const endDateObj = new Date(endDate);
+            let lessonsCreated = 0;
+            let iterations = 0;
+            const maxIterations = 1000;
+
+            while (lessonsCreated < totalLessonsNeeded && currentDate <= endDateObj && iterations < maxIterations) {
+               iterations++;
+               const dayOfWeek = currentDate.getDay();
+               const lessonDateStr = currentDate.toISOString().split('T')[0];
+
+               const isValidDay =
+                  schedule.daysOfWeek.includes(dayOfWeek) &&
+                  !isHoliday(lessonDateStr);
+
+               if (isValidDay) {
+                  lessonsToInsert.push({
+                     course_name: savedPlanForCalendar.name,
+                     title: subject.subject_name,
+                     teacher_name: subject.teacher_name || '',
+                     room: schedule.room,
+                     lesson_date: lessonDateStr,
+                     start_time: schedule.startTime,
+                     end_time: schedule.endTime,
+                     is_hybrid: false,
+                  });
+                  lessonsCreated++;
+               }
+
+               currentDate.setDate(currentDate.getDate() + 1);
+            }
+         }
+
+         if (lessonsToInsert.length > 0) {
+            const { error: insertError } = await supabase
+               .from('lessons')
+               .insert(lessonsToInsert);
+
+            if (insertError) throw insertError;
+         }
+
+         alert(`✅ Calendario rigenerato! ${lessonsToInsert.length} lezioni create.`);
+         setShowRegenerateCalendar(false);
+         setSavedPlanForCalendar(null);
+         setSavedSubjectsForCalendar([]);
+      } catch (error: any) {
+         console.error('Errore rigenerazione calendario:', error);
+         alert(`❌ Errore durante la rigenerazione: ${error.message}`);
+      }
+   };
+
 
    // Menu items per la sidebar interna
    const subMenuItems: { id: DidacticsSubSection; label: string; icon: string }[] = [
@@ -872,9 +959,12 @@ const DidacticsView: React.FC = () => {
                            </div>
 
                            {/* Info aggiuntive */}
-                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-                              <p className="font-medium mb-1">ℹ️ Nota:</p>
-                              <p>Le modifiche alle materie non rigenerano automaticamente il calendario. Se hai modificato ore o materie, dovrai aggiornare manualmente le lezioni nel calendario.</p>
+                           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
+                              <p className="font-medium mb-1 flex items-center gap-2">
+                                 <Calendar className="w-4 h-4" />
+                                 Rigenerazione Calendario Automatica
+                              </p>
+                              <p>Dopo aver salvato le modifiche, ti verrà chiesto se vuoi rigenerare automaticamente il calendario con le nuove materie e ore aggiornate.</p>
                            </div>
                         </>
                      )}
@@ -912,6 +1002,70 @@ const DidacticsView: React.FC = () => {
                   </div>
                </div>
             </div>
+         )}
+
+         {/* Modal Conferma Rigenerazione Calendario */}
+         {showRegenerateCalendar && savedPlanForCalendar && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+               <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                  <div className="flex items-start gap-4 mb-6">
+                     <div className="w-12 h-12 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center">
+                        <RefreshCw className="w-6 h-6 text-blue-600" />
+                     </div>
+                     <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                           Vuoi rigenerare il calendario?
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                           Le modifiche al piano "<strong>{savedPlanForCalendar.name}</strong>" sono state salvate con successo.
+                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+                           <p className="font-medium mb-1">📅 Rigenerazione calendario:</p>
+                           <ul className="list-disc list-inside space-y-1 ml-2">
+                              <li>Elimina tutte le vecchie lezioni</li>
+                              <li>Genera nuove lezioni con materie/ore aggiornate</li>
+                              <li>Ti chiederà date e orari per la calendarizzazione</li>
+                           </ul>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                     <button
+                        onClick={() => {
+                           setShowRegenerateCalendar(false);
+                           setSavedPlanForCalendar(null);
+                           setSavedSubjectsForCalendar([]);
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                     >
+                        No, mantieni calendario attuale
+                     </button>
+                     <button
+                        onClick={() => {
+                           // Chiudi questo modal e apri CalendarWizard
+                           setShowRegenerateCalendar(false);
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                     >
+                        <RefreshCw className="w-4 h-4" />
+                        Sì, rigenera calendario
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
+
+         {/* CalendarWizard per Rigenerazione */}
+         {!showRegenerateCalendar && savedPlanForCalendar && savedSubjectsForCalendar.length > 0 && (
+            <CalendarWizard
+               subjects={savedSubjectsForCalendar}
+               onComplete={handleRegenerateCalendar}
+               onCancel={() => {
+                  setSavedPlanForCalendar(null);
+                  setSavedSubjectsForCalendar([]);
+               }}
+            />
          )}
 
          {/* Modal Conferma Eliminazione */}
