@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Trash2, AlertTriangle, Pencil, Plus, Save } from 'lucide-react';
 import { CORSI_STRUTTURA } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Student, StudyPlan, StudyPlanSubject } from '../types';
@@ -30,6 +30,10 @@ const DidacticsView: React.FC = () => {
    const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
    const [planToDelete, setPlanToDelete] = useState<StudyPlan | null>(null);
    const [isDeleting, setIsDeleting] = useState(false);
+   const [planToEdit, setPlanToEdit] = useState<StudyPlan | null>(null);
+   const [editSubjects, setEditSubjects] = useState<StudyPlanSubject[]>([]);
+   const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
+   const [isSaving, setIsSaving] = useState(false);
 
    // Carica studenti
    useEffect(() => {
@@ -93,6 +97,103 @@ const DidacticsView: React.FC = () => {
          alert(`❌ Errore durante l'eliminazione: ${error.message}`);
       } finally {
          setIsDeleting(false);
+      }
+   };
+
+   const handleEditPlan = async (plan: StudyPlan) => {
+      setPlanToEdit(plan);
+      setIsLoadingSubjects(true);
+
+      // Carica materie del piano
+      const { data, error } = await supabase
+         .from('study_plan_subjects')
+         .select('*')
+         .eq('study_plan_id', plan.id)
+         .order('order_index');
+
+      if (!error && data) {
+         setEditSubjects(data);
+      }
+      setIsLoadingSubjects(false);
+   };
+
+   const handleAddSubject = () => {
+      const newSubject: StudyPlanSubject = {
+         study_plan_id: planToEdit?.id || '',
+         subject_name: '',
+         subject_type: 'collective',
+         total_hours: 20,
+         teacher_name: '',
+         order_index: editSubjects.length,
+      };
+      setEditSubjects([...editSubjects, newSubject]);
+   };
+
+   const handleRemoveSubject = (index: number) => {
+      setEditSubjects(editSubjects.filter((_, i) => i !== index));
+   };
+
+   const handleUpdateSubject = (index: number, field: keyof StudyPlanSubject, value: any) => {
+      const updated = [...editSubjects];
+      (updated[index] as any)[field] = value;
+      setEditSubjects(updated);
+   };
+
+   const handleSaveEdit = async () => {
+      if (!planToEdit) return;
+
+      setIsSaving(true);
+      try {
+         // 1. Aggiorna info piano
+         const { error: planError } = await supabase
+            .from('study_plans')
+            .update({
+               name: planToEdit.name,
+               description: planToEdit.description,
+               category: planToEdit.category,
+               subcategory: planToEdit.subcategory,
+            })
+            .eq('id', planToEdit.id);
+
+         if (planError) throw planError;
+
+         // 2. Elimina tutte le materie esistenti
+         const { error: deleteError } = await supabase
+            .from('study_plan_subjects')
+            .delete()
+            .eq('study_plan_id', planToEdit.id);
+
+         if (deleteError) throw deleteError;
+
+         // 3. Inserisci materie aggiornate (filtro quelle con nome)
+         const validSubjects = editSubjects
+            .filter(s => s.subject_name.trim() !== '')
+            .map((s, idx) => ({
+               study_plan_id: planToEdit.id,
+               subject_name: s.subject_name,
+               subject_type: s.subject_type,
+               total_hours: s.total_hours,
+               teacher_name: s.teacher_name || null,
+               order_index: idx,
+            }));
+
+         if (validSubjects.length > 0) {
+            const { error: insertError } = await supabase
+               .from('study_plan_subjects')
+               .insert(validSubjects);
+
+            if (insertError) throw insertError;
+         }
+
+         alert(`✅ Piano "${planToEdit.name}" modificato con successo!`);
+         await fetchStudyPlans();
+         setPlanToEdit(null);
+         setEditSubjects([]);
+      } catch (error: any) {
+         console.error('Errore salvataggio modifiche:', error);
+         alert(`❌ Errore durante il salvataggio: ${error.message}`);
+      } finally {
+         setIsSaving(false);
       }
    };
 
@@ -343,6 +444,13 @@ const DidacticsView: React.FC = () => {
                                                 <span className={`text-xs px-2 py-1 rounded-full font-bold ${studentiPiano.length > 0 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
                                                    {studentiPiano.length}
                                                 </span>
+                                                <button
+                                                   onClick={() => handleEditPlan(plan)}
+                                                   className="w-7 h-7 flex items-center justify-center rounded-md bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors"
+                                                   title="Modifica piano"
+                                                >
+                                                   <Pencil className="w-4 h-4" />
+                                                </button>
                                                 <button
                                                    onClick={() => setPlanToDelete(plan)}
                                                    className="w-7 h-7 flex items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
@@ -615,6 +723,195 @@ const DidacticsView: React.FC = () => {
                   fetchStudyPlans();
                }}
             />
+         )}
+
+         {/* Modal Modifica Piano */}
+         {planToEdit && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+               <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                  {/* Header */}
+                  <div className="sticky top-0 bg-blue-600 text-white p-6 flex justify-between items-center">
+                     <div>
+                        <h2 className="text-2xl font-bold">Modifica Piano di Studio</h2>
+                        <p className="text-blue-100 text-sm mt-1">{planToEdit.name}</p>
+                     </div>
+                     <button
+                        onClick={() => {
+                           setPlanToEdit(null);
+                           setEditSubjects([]);
+                        }}
+                        className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all"
+                     >
+                        <X className="w-6 h-6" />
+                     </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6">
+                     {isLoadingSubjects ? (
+                        <div className="text-center py-12">
+                           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                           <p className="text-gray-500">Caricamento materie...</p>
+                        </div>
+                     ) : (
+                        <>
+                           {/* Info Piano */}
+                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                              <h3 className="font-semibold text-gray-800 mb-3">Informazioni Piano</h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Piano</label>
+                                    <input
+                                       type="text"
+                                       value={planToEdit.name}
+                                       onChange={(e) => setPlanToEdit({ ...planToEdit, name: e.target.value })}
+                                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                                    <select
+                                       value={planToEdit.category}
+                                       onChange={(e) => setPlanToEdit({ ...planToEdit, category: e.target.value })}
+                                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                    >
+                                       {Object.keys(CORSI_STRUTTURA).map(cat => (
+                                          <option key={cat} value={cat}>{cat}</option>
+                                       ))}
+                                    </select>
+                                 </div>
+                                 <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione (opzionale)</label>
+                                    <textarea
+                                       value={planToEdit.description || ''}
+                                       onChange={(e) => setPlanToEdit({ ...planToEdit, description: e.target.value })}
+                                       rows={2}
+                                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                    />
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* Materie */}
+                           <div className="mb-6">
+                              <div className="flex items-center justify-between mb-4">
+                                 <h3 className="font-semibold text-gray-800">Materie del Piano</h3>
+                                 <button
+                                    onClick={handleAddSubject}
+                                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+                                 >
+                                    <Plus className="w-4 h-4" />
+                                    Aggiungi Materia
+                                 </button>
+                              </div>
+
+                              {editSubjects.length === 0 ? (
+                                 <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                    <p className="text-gray-500">Nessuna materia. Clicca "Aggiungi Materia" per iniziare.</p>
+                                 </div>
+                              ) : (
+                                 <div className="space-y-3">
+                                    {editSubjects.map((subject, idx) => (
+                                       <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                          <div className="flex items-start gap-3">
+                                             <div className="flex-1 grid grid-cols-4 gap-3">
+                                                <div>
+                                                   <label className="block text-xs font-medium text-gray-600 mb-1">Nome Materia *</label>
+                                                   <input
+                                                      type="text"
+                                                      value={subject.subject_name}
+                                                      onChange={(e) => handleUpdateSubject(idx, 'subject_name', e.target.value)}
+                                                      placeholder="es. Teoria Musicale"
+                                                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                                   />
+                                                </div>
+                                                <div>
+                                                   <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+                                                   <select
+                                                      value={subject.subject_type}
+                                                      onChange={(e) => handleUpdateSubject(idx, 'subject_type', e.target.value)}
+                                                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                                   >
+                                                      <option value="collective">Collettivo</option>
+                                                      <option value="individual">Individuale</option>
+                                                   </select>
+                                                </div>
+                                                <div>
+                                                   <label className="block text-xs font-medium text-gray-600 mb-1">Ore Totali</label>
+                                                   <input
+                                                      type="number"
+                                                      value={subject.total_hours}
+                                                      onChange={(e) => handleUpdateSubject(idx, 'total_hours', parseInt(e.target.value))}
+                                                      min="1"
+                                                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                                   />
+                                                </div>
+                                                <div>
+                                                   <label className="block text-xs font-medium text-gray-600 mb-1">Docente</label>
+                                                   <input
+                                                      type="text"
+                                                      value={subject.teacher_name || ''}
+                                                      onChange={(e) => handleUpdateSubject(idx, 'teacher_name', e.target.value)}
+                                                      placeholder="Nome docente"
+                                                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                                   />
+                                                </div>
+                                             </div>
+                                             <button
+                                                onClick={() => handleRemoveSubject(idx)}
+                                                className="mt-6 w-8 h-8 flex items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors"
+                                                title="Rimuovi materia"
+                                             >
+                                                <Trash2 className="w-4 h-4" />
+                                             </button>
+                                          </div>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+
+                           {/* Info aggiuntive */}
+                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                              <p className="font-medium mb-1">ℹ️ Nota:</p>
+                              <p>Le modifiche alle materie non rigenerano automaticamente il calendario. Se hai modificato ore o materie, dovrai aggiornare manualmente le lezioni nel calendario.</p>
+                           </div>
+                        </>
+                     )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                     <button
+                        onClick={() => {
+                           setPlanToEdit(null);
+                           setEditSubjects([]);
+                        }}
+                        disabled={isSaving}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                     >
+                        Annulla
+                     </button>
+                     <button
+                        onClick={handleSaveEdit}
+                        disabled={isSaving || isLoadingSubjects}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                     >
+                        {isSaving ? (
+                           <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Salvataggio...
+                           </>
+                        ) : (
+                           <>
+                              <Save className="w-4 h-4" />
+                              Salva Modifiche
+                           </>
+                        )}
+                     </button>
+                  </div>
+               </div>
+            </div>
          )}
 
          {/* Modal Conferma Eliminazione */}
