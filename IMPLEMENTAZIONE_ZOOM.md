@@ -1,387 +1,332 @@
-# IMPLEMENTAZIONE ZOOM API - NAM MAESTRO
+# INTEGRAZIONE ZOOM - LINK JUST-IN-TIME
 
-## Indice
+## 📋 Indice
 
-1. [Panoramica](#panoramica)
-2. [Prerequisiti](#prerequisiti)
-3. [Piano di Azione](#piano-di-azione)
-4. [Architettura Tecnica](#architettura-tecnica)
-5. [Implementazione Dettagliata](#implementazione-dettagliata)
-6. [Gestione Insidie](#gestione-insidie)
-7. [Testing](#testing)
-8. [Troubleshooting](#troubleshooting)
-9. [Checklist Finale](#checklist-finale)
+1. [Panoramica Sistema](#panoramica-sistema)
+2. [Architettura](#architettura)
+3. [Prerequisiti](#prerequisiti)
+4. [Implementazione](#implementazione)
+5. [Testing](#testing)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Panoramica
+## Panoramica Sistema
 
-### Obiettivo
+### 🎯 Obiettivo
 
-Implementare la creazione automatica di link Zoom per lezioni ibride:
-- L'utente crea una lezione nel gestionale e spunta "Lezione Ibrida"
-- Il sistema automaticamente crea un meeting Zoom
-- Il link viene salvato nel database e mostrato nel calendario
-- Studenti e docenti possono accedere al link direttamente dall'app
+Implementare un sistema automatico di gestione meeting Zoom "just-in-time":
+- **45 minuti prima** della lezione: Crea link Zoom automaticamente
+- **Dopo la lezione**: Cancella meeting e recupera registrazione
+- **Notte**: Invia registrazioni agli studenti
 
-### Flusso Utente
+### 🔄 Flusso Automatico
 
 ```
-1. Segreteria crea lezione ibrida → Compila form + spunta "Lezione Ibrida"
-2. Sistema salva nel DB → Lezione salvata in tabella `lessons`
-3. Sistema chiama Zoom API → Automatico in background
-4. Zoom crea meeting → Risponde con link
-5. Sistema salva link → UPDATE lessons SET zoom_link = '...'
-6. Calendario si aggiorna → Real-time Supabase
-7. Studenti vedono link → Nell'app PWA
+[Lezione schedulata]
+         ↓
+    (45 min prima)
+         ↓
+[Cron crea link Zoom] ──→ [Studenti/docenti vedono link]
+         ↓
+   (Lezione finisce)
+         ↓
+    (3 ore dopo)
+         ↓
+[Cron cancella meeting] ──→ [Recupera registrazione]
+         ↓
+    (Notte, 02:00)
+         ↓
+[Cron invia email] ──→ [Studenti ricevono registrazione]
 ```
 
-### Difficoltà Generale: ⭐⭐⭐☆☆ (MEDIA)
+### ✅ Vantaggi
+
+- ✅ **Link effimeri**: Esistono solo quando servono
+- ✅ **Dashboard Zoom pulita**: Solo meeting attivi visibili
+- ✅ **Meno sprechi**: Non si creano link per lezioni cancellate in anticipo
+- ✅ **Registrazioni automatiche**: Recuperate e inviate senza intervento manuale
+- ✅ **Sicurezza**: Link non più validi dopo la lezione
+
+---
+
+## Architettura
+
+### 🏗️ Componenti
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        SUPABASE                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌───────────────┐      ┌────────────────────────────────┐  │
+│  │   pg_cron     │──────▶│    Edge Functions              │  │
+│  │   Scheduler   │      │                                 │  │
+│  └───────────────┘      │  1. create-zoom-links-scheduled │  │
+│         │               │  2. cleanup-zoom-meetings       │  │
+│         │               │  3. fetch-zoom-recordings       │  │
+│         │               └────────────────────────────────┘  │
+│         │                            │                       │
+│         ▼                            ▼                       │
+│  ┌───────────────┐           ┌──────────────┐              │
+│  │   Database    │           │  Zoom API    │              │
+│  │   lessons     │           │              │              │
+│  └───────────────┘           └──────────────┘              │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌───────────────┐                                          │
+│  │   Frontend    │                                          │
+│  │  CalendarView │                                          │
+│  └───────────────┘                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 📊 Schedule Cron Jobs
+
+| Job | Frequenza | Funzione | Azione |
+|-----|-----------|----------|--------|
+| **create-zoom-links** | Ogni 5 minuti | Crea link 45 min prima | Cerca lezioni ibride che iniziano tra 40-50 min senza link → Crea meeting Zoom |
+| **cleanup-zoom-meetings** | Ogni ora | Cancella meeting terminati | Cerca lezioni finite da 3+ ore con meeting attivo → Cancella meeting Zoom |
+| **fetch-zoom-recordings** | Ogni notte 02:00 | Recupera e invia registrazioni | Cerca lezioni di ieri con meeting → Recupera registrazione → Invia email studenti |
 
 ---
 
 ## Prerequisiti
 
-### 1. Account e Credenziali Zoom
+### 1. ✅ Già Implementato
 
-#### Setup Account Zoom
+- [x] Account Zoom Pro attivo
+- [x] App Zoom configurata con scopes:
+  - `meeting:write:admin`
+  - `meeting:read:admin`
+  - `meeting:delete:admin`
+  - `meeting:update:meeting:admin`
+- [x] Secrets Supabase configurati:
+  - `ZOOM_ACCOUNT_ID`
+  - `ZOOM_CLIENT_ID`
+  - `ZOOM_CLIENT_SECRET`
+- [x] Tabella `lessons` con campi Zoom
+- [x] Edge Functions base (create, update, delete)
 
-- [ ] Account Zoom esistente (o crearne uno)
-- [ ] Piano **Zoom Pro** attivo (€13-15/mese)
-  - **Perché:** Piano gratuito limita meeting a 40 minuti
-  - **Pro:** Meeting illimitati fino a 30 ore
-- [ ] Accesso a [marketplace.zoom.us](https://marketplace.zoom.us)
+### 2. ⚠️ Da Aggiungere
 
-#### Creare Zoom App (GRATUITO)
-
-**Step by step:**
-
-1. Vai su https://marketplace.zoom.us/
-2. Click **"Develop"** → **"Build App"**
-3. Scegli **"Server-to-Server OAuth"** (NON OAuth standard, NON JWT)
-4. Compila form:
-   - **App Name:** `NAM Maestro Integration`
-   - **Company Name:** Nome scuola
-   - **Developer Contact:** Email admin
-5. **Scopes (Permessi richiesti):**
-   ```
-   ✅ meeting:write:admin  - Creare meeting
-   ✅ meeting:read:admin   - Leggere info meeting
-   ✅ meeting:delete:admin - Cancellare meeting (opzionale)
-   ```
-6. **Copia e salva** (in luogo sicuro, NON su git):
-   ```
-   Account ID: abc123xyz...
-   Client ID: xyz789abc...
-   Client Secret: supersecretkey123... (NON lo rivedi più!)
-   ```
-7. **Attiva app:** Toggle "Activated" → **ON**
-
-**Costo:** €0 (completamente gratuito)
-**Tempo richiesto:** ~5 minuti
-
-### 2. Accesso Supabase
-
-- [ ] Accesso dashboard Supabase
-- [ ] Service Role Key disponibile (già in `.env`)
-- [ ] Possibilità di creare Edge Functions
-- [ ] Possibilità di eseguire migrations SQL
-
-### 3. Ambiente di Sviluppo
-
-- [ ] Node.js installato (per Supabase CLI)
-- [ ] Supabase CLI (opzionale ma consigliato):
-  ```bash
-  npm install -g supabase
-  ```
-- [ ] Editor di codice (VS Code consigliato)
+- [ ] Abilitare **pg_cron** su Supabase
+- [ ] Aggiungere campi **registrazioni** alla tabella `lessons`
+- [ ] Scope Zoom per **registrazioni**: `recording:read:admin`
+- [ ] Edge Function per **email** studenti (opzionale)
 
 ---
 
-## Piano di Azione
+## Implementazione
 
-### FASE 1: Verifica e Setup Iniziale
+## FASE 1: Setup Database
 
-#### Step 1.1: Verificare Struttura Database `lessons`
+### Step 1.1: Aggiungi campi registrazioni
 
-**Problema attuale:** La tabella `lessons` non ha migration SQL nel repository.
-
-**Azione:**
-```sql
--- Eseguire questa query nel dashboard Supabase per vedere lo schema
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'lessons'
-ORDER BY ordinal_position;
-```
-
-**Output atteso:**
-```
-column_name   | data_type | is_nullable
---------------|-----------|------------
-id            | uuid      | NO
-course_name   | text      | YES
-title         | text      | YES
-teacher_name  | text      | YES
-lesson_date   | date      | YES
-start_time    | time      | YES
-end_time      | time      | YES
-room          | text      | YES
-is_hybrid     | boolean   | YES
-```
-
-#### Step 1.2: Creare Migration per Campi Zoom
-
-**File:** `supabase/migrations/20260218_add_zoom_fields.sql`
+Esegui nel **SQL Editor** di Supabase:
 
 ```sql
--- Aggiungi campi per Zoom
+-- Aggiungi campi per registrazioni
 ALTER TABLE lessons
-ADD COLUMN IF NOT EXISTS zoom_meeting_id TEXT,
-ADD COLUMN IF NOT EXISTS zoom_link TEXT,
-ADD COLUMN IF NOT EXISTS zoom_host_link TEXT,
-ADD COLUMN IF NOT EXISTS zoom_password TEXT,
-ADD COLUMN IF NOT EXISTS zoom_created_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS zoom_error TEXT,
-ADD COLUMN IF NOT EXISTS zoom_retry_count INTEGER DEFAULT 0;
+ADD COLUMN IF NOT EXISTS recording_url TEXT,
+ADD COLUMN IF NOT EXISTS recording_password TEXT,
+ADD COLUMN IF NOT EXISTS recording_share_url TEXT,
+ADD COLUMN IF NOT EXISTS recording_downloaded_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS recording_duration INTEGER, -- in minuti
+ADD COLUMN IF NOT EXISTS recording_file_size BIGINT; -- in bytes
 
 -- Indice per query veloci
-CREATE INDEX IF NOT EXISTS idx_lessons_zoom_meeting_id
-ON lessons(zoom_meeting_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_recording_url
+ON lessons(recording_url)
+WHERE recording_url IS NOT NULL;
 
--- Indice per trovare lezioni con errori
-CREATE INDEX IF NOT EXISTS idx_lessons_zoom_error
-ON lessons(zoom_error)
-WHERE zoom_error IS NOT NULL;
-
--- Commenti per documentazione
-COMMENT ON COLUMN lessons.zoom_meeting_id IS 'ID univoco meeting Zoom (es: 87654321098)';
-COMMENT ON COLUMN lessons.zoom_link IS 'Link join per studenti (es: https://zoom.us/j/...)';
-COMMENT ON COLUMN lessons.zoom_host_link IS 'Link start per docente (es: https://zoom.us/s/...)';
-COMMENT ON COLUMN lessons.zoom_password IS 'Password meeting Zoom';
-COMMENT ON COLUMN lessons.zoom_created_at IS 'Timestamp creazione meeting Zoom';
-COMMENT ON COLUMN lessons.zoom_error IS 'Messaggio errore se creazione Zoom fallisce';
-COMMENT ON COLUMN lessons.zoom_retry_count IS 'Numero tentativi creazione Zoom';
+-- Commenti
+COMMENT ON COLUMN lessons.recording_url IS 'URL diretto file registrazione Zoom';
+COMMENT ON COLUMN lessons.recording_share_url IS 'URL condivisione pubblica registrazione';
+COMMENT ON COLUMN lessons.recording_password IS 'Password per accedere alla registrazione';
+COMMENT ON COLUMN lessons.recording_downloaded_at IS 'Timestamp recupero registrazione';
 ```
 
-**Eseguire migration:**
-```bash
-# Opzione A: Dashboard Supabase
-# SQL Editor → Incolla SQL → Run
+### Step 1.2: Abilita pg_cron
 
-# Opzione B: Supabase CLI (se configurato)
-supabase db push
-```
+```sql
+-- Abilita estensione pg_cron
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
-#### Step 1.3: Configurare Secrets Supabase
-
-**⚠️ IMPORTANTE: NON mettere credenziali nel file `.env` del repository!**
-
-**Opzione A: Dashboard Supabase (Consigliata)**
-
-1. Vai su dashboard Supabase → Progetto NAM Maestro
-2. **Settings** → **Edge Functions** → **Secrets**
-3. Aggiungi 3 secrets:
-   ```
-   Name: ZOOM_ACCOUNT_ID
-   Value: [Incolla Account ID da Zoom App]
-
-   Name: ZOOM_CLIENT_ID
-   Value: [Incolla Client ID da Zoom App]
-
-   Name: ZOOM_CLIENT_SECRET
-   Value: [Incolla Client Secret da Zoom App]
-   ```
-4. Click **"Add secret"** per ognuno
-5. **Salva**
-
-**Opzione B: Supabase CLI**
-
-```bash
-# Solo se usi Supabase CLI locale
-supabase secrets set ZOOM_ACCOUNT_ID="abc123xyz"
-supabase secrets set ZOOM_CLIENT_ID="xyz789abc"
-supabase secrets set ZOOM_CLIENT_SECRET="supersecretkey123"
-```
-
-**Verifica secrets:**
-```bash
-supabase secrets list
-# Output:
-# ZOOM_ACCOUNT_ID
-# ZOOM_CLIENT_ID
-# ZOOM_CLIENT_SECRET
+-- Verifica che sia attiva
+SELECT extname, extversion FROM pg_extension WHERE extname = 'pg_cron';
+-- Dovrebbe restituire: pg_cron | 1.x
 ```
 
 ---
 
-### FASE 2: Implementazione Edge Functions
+## FASE 2: Edge Functions Schedulabili
 
-#### Step 2.1: Creare Edge Function per Autenticazione Zoom
+### Step 2.1: Edge Function - Creazione Link Schedulata
 
-**File:** `supabase/functions/_shared/zoom-auth.ts`
-
-```typescript
-/**
- * Ottiene access token Zoom tramite OAuth Server-to-Server
- * @returns {Promise<string>} Access token valido per 1 ora
- */
-export async function getZoomAccessToken(): Promise<string> {
-  const accountId = Deno.env.get('ZOOM_ACCOUNT_ID')
-  const clientId = Deno.env.get('ZOOM_CLIENT_ID')
-  const clientSecret = Deno.env.get('ZOOM_CLIENT_SECRET')
-
-  if (!accountId || !clientId || !clientSecret) {
-    throw new Error('Zoom credentials not configured in Supabase secrets')
-  }
-
-  // Codifica credenziali in Base64
-  const credentials = btoa(`${clientId}:${clientSecret}`)
-
-  const response = await fetch(
-    `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${accountId}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    }
-  )
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Zoom OAuth failed: ${error}`)
-  }
-
-  const data = await response.json()
-  return data.access_token
-}
-
-/**
- * Calcola durata in minuti tra due orari
- */
-export function calculateDuration(startTime: string, endTime: string): number {
-  const [startH, startM] = startTime.split(':').map(Number)
-  const [endH, endM] = endTime.split(':').map(Number)
-  return (endH * 60 + endM) - (startH * 60 + startM)
-}
-```
-
-#### Step 2.2: Edge Function - Creazione Meeting Singolo
-
-**File:** `supabase/functions/create-zoom-meeting/index.ts`
+**File:** `supabase/functions/create-zoom-links-scheduled/index.ts`
 
 ```typescript
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { getZoomAccessToken, calculateDuration } from '../_shared/zoom-auth.ts'
 
-interface CreateMeetingRequest {
-  lesson_id: string
-  title: string
-  teacher_name: string
-  lesson_date: string
-  start_time: string
-  end_time: string
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
-    // Parse request
-    const body: CreateMeetingRequest = await req.json()
-    const { lesson_id, title, teacher_name, lesson_date, start_time, end_time } = body
-
-    console.log(`Creating Zoom meeting for lesson ${lesson_id}: ${title}`)
-
-    // 1. Ottieni access token Zoom
-    const zoomToken = await getZoomAccessToken()
-
-    // 2. Calcola durata lezione
-    const duration = calculateDuration(start_time, end_time)
-
-    // 3. Crea meeting Zoom
-    const meetingPayload = {
-      topic: `${title} - ${teacher_name}`,
-      type: 2, // Scheduled meeting
-      start_time: `${lesson_date}T${start_time}:00`, // ISO 8601 format
-      duration: duration,
-      timezone: 'Europe/Rome', // IMPORTANTE: timezone italiana
-      settings: {
-        host_video: true,
-        participant_video: true,
-        join_before_host: false, // Studenti aspettano il docente
-        mute_upon_entry: true,
-        waiting_room: true,
-        audio: 'both',
-        auto_recording: 'none', // Cambia in 'cloud' per registrazione automatica
-        alternative_hosts: '', // Opzionale: email altri host
-      }
-    }
-
-    const meetingResponse = await fetch(
-      'https://api.zoom.us/v2/users/me/meetings',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${zoomToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(meetingPayload)
-      }
-    )
-
-    if (!meetingResponse.ok) {
-      const error = await meetingResponse.text()
-      throw new Error(`Zoom API error: ${error}`)
-    }
-
-    const meeting = await meetingResponse.json()
-
-    console.log(`Zoom meeting created: ${meeting.id}`)
-
-    // 4. Aggiorna lesson nel database
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { error: updateError } = await supabase
-      .from('lessons')
-      .update({
-        zoom_meeting_id: meeting.id.toString(),
-        zoom_link: meeting.join_url,
-        zoom_host_link: meeting.start_url,
-        zoom_password: meeting.password || null,
-        zoom_created_at: new Date().toISOString(),
-        zoom_error: null, // Pulisci eventuali errori precedenti
-        zoom_retry_count: 0
-      })
-      .eq('id', lesson_id)
+    console.log('🔍 Checking for lessons starting in 40-50 minutes...')
 
-    if (updateError) {
-      console.error('Database update error:', updateError)
-      throw updateError
+    // Calcola finestra temporale: lezioni che iniziano tra 40-50 minuti da ora
+    const now = new Date()
+    const in40Min = new Date(now.getTime() + 40 * 60 * 1000)
+    const in50Min = new Date(now.getTime() + 50 * 60 * 1000)
+
+    const todayDate = now.toISOString().split('T')[0]
+    const time40Min = in40Min.toTimeString().split(' ')[0].substring(0, 5)
+    const time50Min = in50Min.toTimeString().split(' ')[0].substring(0, 5)
+
+    console.log(`📅 Looking for lessons on ${todayDate} between ${time40Min} and ${time50Min}`)
+
+    // Query: lezioni ibride senza link Zoom che iniziano tra 40-50 minuti
+    const { data: lessons, error: queryError } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('is_hybrid', true)
+      .is('zoom_meeting_id', null) // Senza link ancora
+      .eq('lesson_date', todayDate)
+      .gte('start_time', time40Min)
+      .lte('start_time', time50Min)
+
+    if (queryError) throw queryError
+
+    console.log(`📊 Found ${lessons?.length || 0} lessons to process`)
+
+    if (!lessons || lessons.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No lessons to process',
+          processed: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log(`Database updated for lesson ${lesson_id}`)
+    // Ottieni token Zoom una volta sola
+    const zoomToken = await getZoomAccessToken()
 
-    // 5. Risposta
+    let created = 0
+    let failed = 0
+    const errors: any[] = []
+
+    // Crea meeting Zoom per ogni lezione
+    for (const lesson of lessons) {
+      try {
+        console.log(`🎥 Creating Zoom meeting for lesson ${lesson.id} (${lesson.title})`)
+
+        const duration = calculateDuration(lesson.start_time, lesson.end_time)
+
+        // Crea meeting Zoom
+        const meetingResponse = await fetch(
+          'https://api.zoom.us/v2/users/me/meetings',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${zoomToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              topic: `${lesson.title} - ${lesson.teacher_name}`,
+              type: 2,
+              start_time: `${lesson.lesson_date}T${lesson.start_time}:00`,
+              duration,
+              timezone: 'Europe/Rome',
+              settings: {
+                host_video: true,
+                participant_video: true,
+                join_before_host: false,
+                mute_upon_entry: true,
+                waiting_room: true,
+                audio: 'both',
+                auto_recording: 'cloud' // 🎬 IMPORTANTE: Registrazione automatica su cloud
+              }
+            })
+          }
+        )
+
+        if (!meetingResponse.ok) {
+          const error = await meetingResponse.text()
+          throw new Error(`Zoom API: ${error}`)
+        }
+
+        const meeting = await meetingResponse.json()
+
+        // Salva nel database
+        const { error: updateError } = await supabase
+          .from('lessons')
+          .update({
+            zoom_meeting_id: meeting.id.toString(),
+            zoom_link: meeting.join_url,
+            zoom_host_link: meeting.start_url,
+            zoom_password: meeting.password || null,
+            zoom_created_at: new Date().toISOString(),
+            zoom_error: null
+          })
+          .eq('id', lesson.id)
+
+        if (updateError) throw updateError
+
+        console.log(`✅ Created meeting ${meeting.id} for lesson ${lesson.id}`)
+        created++
+
+      } catch (error) {
+        console.error(`❌ Failed to create meeting for lesson ${lesson.id}:`, error.message)
+        failed++
+        errors.push({
+          lesson_id: lesson.id,
+          title: lesson.title,
+          error: error.message
+        })
+
+        // Salva errore nel database
+        await supabase
+          .from('lessons')
+          .update({ zoom_error: error.message })
+          .eq('id', lesson.id)
+      }
+    }
+
+    console.log(`📊 Results: ${created} created, ${failed} failed`)
+
     return new Response(
       JSON.stringify({
         success: true,
-        meeting_id: meeting.id,
-        join_url: meeting.join_url,
-        start_url: meeting.start_url
+        processed: lessons.length,
+        created,
+        failed,
+        errors: errors.length > 0 ? errors : undefined
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
     )
 
   } catch (error) {
-    console.error('Error creating Zoom meeting:', error)
+    console.error('❌ Scheduled job error:', error)
 
     return new Response(
       JSON.stringify({
@@ -389,7 +334,7 @@ serve(async (req) => {
         error: error.message
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
     )
@@ -397,1207 +342,706 @@ serve(async (req) => {
 })
 ```
 
-#### Step 2.3: Edge Function - Creazione Batch con Rate Limiting
+**Configurazione:** `supabase/functions/create-zoom-links-scheduled/deno.json`
 
-**File:** `supabase/functions/create-zoom-meetings-batch/index.ts`
+```json
+{
+  "imports": {}
+}
+```
+
+### Step 2.2: Edge Function - Cleanup Meeting Terminati
+
+**File:** `supabase/functions/cleanup-zoom-meetings/index.ts`
 
 ```typescript
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
-import { getZoomAccessToken, calculateDuration } from '../_shared/zoom-auth.ts'
+import { getZoomAccessToken } from '../_shared/zoom-auth.ts'
 
-const BATCH_SIZE = 8 // Sotto il limite di 10/sec per sicurezza
-const DELAY_MS = 1000 // 1 secondo tra batch
-
-interface Lesson {
-  id: string
-  title: string
-  teacher_name: string
-  lesson_date: string
-  start_time: string
-  end_time: string
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
-    const { lessons }: { lessons: Lesson[] } = await req.json()
-
-    console.log(`Starting batch creation for ${lessons.length} lessons`)
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const results = {
-      total: lessons.length,
-      created: 0,
-      failed: 0,
-      errors: [] as any[]
+    console.log('🧹 Starting cleanup of completed meetings...')
+
+    // Trova lezioni terminate da più di 3 ore con meeting Zoom ancora attivo
+    const now = new Date()
+    const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+
+    const cutoffDate = threeHoursAgo.toISOString().split('T')[0]
+    const cutoffTime = threeHoursAgo.toTimeString().split(' ')[0].substring(0, 5)
+
+    console.log(`📅 Looking for completed lessons before ${cutoffDate} ${cutoffTime}`)
+
+    const { data: lessons, error: queryError } = await supabase
+      .from('lessons')
+      .select('*')
+      .not('zoom_meeting_id', 'is', null) // Con meeting Zoom
+      .or(`lesson_date.lt.${cutoffDate},and(lesson_date.eq.${cutoffDate},end_time.lt.${cutoffTime})`)
+      .limit(50) // Max 50 per esecuzione per non sovraccaricare
+
+    if (queryError) throw queryError
+
+    console.log(`📊 Found ${lessons?.length || 0} meetings to clean up`)
+
+    if (!lessons || lessons.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No meetings to clean up',
+          deleted: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Processa in batch
-    for (let i = 0; i < lessons.length; i += BATCH_SIZE) {
-      const batch = lessons.slice(i, i + BATCH_SIZE)
-      const batchNumber = Math.floor(i / BATCH_SIZE) + 1
-      const totalBatches = Math.ceil(lessons.length / BATCH_SIZE)
+    const zoomToken = await getZoomAccessToken()
 
-      console.log(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} lessons)`)
+    let deleted = 0
+    let failed = 0
+    const errors: any[] = []
 
-      // Processa batch in parallelo
-      const batchPromises = batch.map(lesson =>
-        createMeetingWithRetry(lesson, supabase)
-      )
+    for (const lesson of lessons) {
+      try {
+        console.log(`🗑️ Deleting Zoom meeting ${lesson.zoom_meeting_id} for lesson ${lesson.id}`)
 
-      const batchResults = await Promise.allSettled(batchPromises)
+        // Cancella meeting su Zoom
+        const response = await fetch(
+          `https://api.zoom.us/v2/meetings/${lesson.zoom_meeting_id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${zoomToken}`
+            }
+          }
+        )
 
-      // Conta risultati
-      batchResults.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.success) {
-          results.created++
-        } else {
-          results.failed++
-          results.errors.push({
-            lesson_id: batch[index].id,
-            error: result.status === 'rejected' ? result.reason : result.value.error
-          })
+        // 404 = già cancellato, OK
+        if (!response.ok && response.status !== 404) {
+          const error = await response.text()
+          throw new Error(`Zoom API: ${error}`)
         }
-      })
 
-      // Delay prima del prossimo batch (tranne l'ultimo)
-      if (i + BATCH_SIZE < lessons.length) {
-        console.log(`Waiting ${DELAY_MS}ms before next batch...`)
-        await new Promise(resolve => setTimeout(resolve, DELAY_MS))
+        // Svuota campi Zoom nel database (mantieni registrazione se presente)
+        const { error: updateError } = await supabase
+          .from('lessons')
+          .update({
+            zoom_meeting_id: null,
+            zoom_link: null,
+            zoom_host_link: null,
+            zoom_password: null
+          })
+          .eq('id', lesson.id)
+
+        if (updateError) throw updateError
+
+        console.log(`✅ Cleaned up lesson ${lesson.id}`)
+        deleted++
+
+      } catch (error) {
+        console.error(`❌ Failed to clean up lesson ${lesson.id}:`, error.message)
+        failed++
+        errors.push({
+          lesson_id: lesson.id,
+          zoom_meeting_id: lesson.zoom_meeting_id,
+          error: error.message
+        })
       }
     }
 
-    console.log(`Batch completed: ${results.created} created, ${results.failed} failed`)
+    console.log(`📊 Results: ${deleted} deleted, ${failed} failed`)
 
     return new Response(
-      JSON.stringify(results),
+      JSON.stringify({
+        success: true,
+        processed: lessons.length,
+        deleted,
+        failed,
+        errors: errors.length > 0 ? errors : undefined
+      }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
     )
 
   } catch (error) {
-    console.error('Batch creation error:', error)
+    console.error('❌ Cleanup job error:', error)
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
     )
   }
 })
+```
 
-/**
- * Crea meeting Zoom con retry automatico
- */
-async function createMeetingWithRetry(
-  lesson: Lesson,
-  supabase: any,
-  maxRetries = 3
-): Promise<{ success: boolean; error?: string }> {
+**Configurazione:** `supabase/functions/cleanup-zoom-meetings/deno.json`
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // Ottieni token
-      const zoomToken = await getZoomAccessToken()
+```json
+{
+  "imports": {}
+}
+```
 
-      // Calcola durata
-      const duration = calculateDuration(lesson.start_time, lesson.end_time)
+### Step 2.3: Edge Function - Recupero Registrazioni
 
-      // Crea meeting
-      const meetingResponse = await fetch(
-        'https://api.zoom.us/v2/users/me/meetings',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${zoomToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            topic: `${lesson.title} - ${lesson.teacher_name}`,
-            type: 2,
-            start_time: `${lesson.lesson_date}T${lesson.start_time}:00`,
-            duration,
-            timezone: 'Europe/Rome',
-            settings: {
-              host_video: true,
-              participant_video: true,
-              join_before_host: false,
-              mute_upon_entry: true,
-              waiting_room: true,
-              audio: 'both',
-              auto_recording: 'none'
-            }
-          })
-        }
+**File:** `supabase/functions/fetch-zoom-recordings/index.ts`
+
+```typescript
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
+import { getZoomAccessToken } from '../_shared/zoom-auth.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    console.log('🎬 Fetching Zoom recordings...')
+
+    // Trova lezioni di ieri/oggi con meeting Zoom ma senza registrazione
+    const now = new Date()
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const yesterdayDate = yesterday.toISOString().split('T')[0]
+    const todayDate = now.toISOString().split('T')[0]
+
+    console.log(`📅 Looking for recordings from ${yesterdayDate} to ${todayDate}`)
+
+    // Nota: zoom_meeting_id viene rimosso dal cleanup, quindi cerchiamo solo lezioni recenti
+    // che potrebbero avere ancora il meeting_id prima del cleanup
+    const { data: lessons, error: queryError } = await supabase
+      .from('lessons')
+      .select('*')
+      .gte('lesson_date', yesterdayDate)
+      .lte('lesson_date', todayDate)
+      .eq('is_hybrid', true)
+      .is('recording_url', null) // Senza registrazione ancora recuperata
+      .not('zoom_meeting_id', 'is', null) // Con meeting ID (prima del cleanup)
+      .limit(50)
+
+    if (queryError) throw queryError
+
+    console.log(`📊 Found ${lessons?.length || 0} lessons to check for recordings`)
+
+    if (!lessons || lessons.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No recordings to fetch',
+          fetched: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
 
-      if (!meetingResponse.ok) {
-        const error = await meetingResponse.text()
-        throw new Error(`Zoom API: ${error}`)
-      }
+    const zoomToken = await getZoomAccessToken()
 
-      const meeting = await meetingResponse.json()
+    let fetched = 0
+    let notFound = 0
+    let failed = 0
+    const errors: any[] = []
 
-      // Salva nel DB
-      await supabase
-        .from('lessons')
-        .update({
-          zoom_meeting_id: meeting.id.toString(),
-          zoom_link: meeting.join_url,
-          zoom_host_link: meeting.start_url,
-          zoom_password: meeting.password || null,
-          zoom_created_at: new Date().toISOString(),
-          zoom_error: null,
-          zoom_retry_count: attempt
-        })
-        .eq('id', lesson.id)
+    for (const lesson of lessons) {
+      try {
+        console.log(`🎥 Checking recordings for meeting ${lesson.zoom_meeting_id}`)
 
-      return { success: true }
+        // Chiama API Zoom per ottenere registrazioni
+        const response = await fetch(
+          `https://api.zoom.us/v2/meetings/${lesson.zoom_meeting_id}/recordings`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${zoomToken}`
+            }
+          }
+        )
 
-    } catch (error) {
-      console.error(`Attempt ${attempt}/${maxRetries} failed for lesson ${lesson.id}:`, error.message)
+        if (response.status === 404) {
+          console.log(`ℹ️ No recording found for meeting ${lesson.zoom_meeting_id}`)
+          notFound++
+          continue
+        }
 
-      if (attempt === maxRetries) {
-        // Ultimo tentativo fallito, salva errore
-        await supabase
+        if (!response.ok) {
+          const error = await response.text()
+          throw new Error(`Zoom API: ${error}`)
+        }
+
+        const recordingData = await response.json()
+
+        if (!recordingData.recording_files || recordingData.recording_files.length === 0) {
+          console.log(`ℹ️ Recording not ready yet for meeting ${lesson.zoom_meeting_id}`)
+          notFound++
+          continue
+        }
+
+        // Prendi la prima registrazione (di solito è la gallery view)
+        const recording = recordingData.recording_files[0]
+
+        // Salva info registrazione nel database
+        const { error: updateError } = await supabase
           .from('lessons')
           .update({
-            zoom_error: error.message,
-            zoom_retry_count: attempt
+            recording_url: recording.download_url,
+            recording_share_url: recordingData.share_url,
+            recording_password: recordingData.password,
+            recording_downloaded_at: new Date().toISOString(),
+            recording_duration: Math.round(recording.recording_end_ms / 60000), // millisecondi -> minuti
+            recording_file_size: recording.file_size
           })
           .eq('id', lesson.id)
 
-        return { success: false, error: error.message }
-      }
-
-      // Exponential backoff: 2s, 4s, 8s
-      const delayMs = Math.pow(2, attempt) * 1000
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-    }
-  }
-
-  return { success: false, error: 'Max retries exceeded' }
-}
-```
-
-#### Step 2.4: Deploy Edge Functions
-
-```bash
-# Deploy funzioni singolarmente
-supabase functions deploy create-zoom-meeting
-supabase functions deploy create-zoom-meetings-batch
-
-# Oppure deploy tutte insieme
-supabase functions deploy
-```
-
-**Verifica deploy:**
-- Dashboard Supabase → Edge Functions
-- Dovresti vedere:
-  - `create-zoom-meeting`
-  - `create-zoom-meetings-batch`
-- Status: **Deployed**
-
----
-
-### FASE 3: Modifiche Frontend
-
-#### Step 3.1: Aggiornare Interfacce TypeScript
-
-**File:** `src/types.ts`
-
-```typescript
-// Aggiungi campi Zoom all'interfaccia Event/CalendarEvent
-
-export interface CalendarEvent {
-  id: number
-  title: string
-  room: string
-  type: 'lesson' | 'collective' | 'exam'
-  time: string
-  isHybrid?: boolean
-  date: Date
-  supabaseId?: string
-  courseName?: string
-
-  // Nuovi campi Zoom
-  zoom_meeting_id?: string
-  zoom_link?: string
-  zoom_host_link?: string
-  zoom_password?: string
-  zoom_created_at?: string
-  zoom_error?: string
-  zoom_retry_count?: number
-}
-```
-
-#### Step 3.2: Modificare CalendarView - Creazione Lezione
-
-**File:** `src/components/CalendarView.tsx`
-
-Trova la funzione di salvataggio lezione e modifica così:
-
-```typescript
-const handleSaveLesson = async (formData: any) => {
-  setLoading(true)
-  setError(null)
-
-  try {
-    // 1. Salva lezione nel database
-    const { data: newLesson, error: insertError } = await supabase
-      .from('lessons')
-      .insert({
-        title: formData.title,
-        teacher_name: formData.teacher,
-        lesson_date: formData.date,
-        start_time: formData.startTime,
-        end_time: formData.endTime,
-        room: formData.room,
-        course_name: formData.courseName,
-        is_hybrid: formData.isHybrid || false
-      })
-      .select()
-      .single()
-
-    if (insertError) throw insertError
-
-    console.log('Lezione salvata:', newLesson.id)
-
-    // 2. Se è ibrida, crea link Zoom automaticamente
-    if (formData.isHybrid) {
-      setMessage('Creazione link Zoom in corso...')
-
-      const { data: zoomData, error: zoomError } = await supabase.functions.invoke(
-        'create-zoom-meeting',
-        {
-          body: {
-            lesson_id: newLesson.id,
-            title: formData.title,
-            teacher_name: formData.teacher,
-            lesson_date: formData.date,
-            start_time: formData.startTime,
-            end_time: formData.endTime
-          }
-        }
-      )
-
-      if (zoomError) {
-        console.error('Errore creazione Zoom:', zoomError)
-        setMessage('⚠️ Lezione creata ma link Zoom non generato. Riprova più tardi.')
-        // Non bloccare il flusso, la lezione è comunque salvata
-      } else {
-        console.log('Link Zoom creato:', zoomData.join_url)
-        setMessage('✅ Lezione creata con link Zoom')
-      }
-    } else {
-      setMessage('✅ Lezione creata')
-    }
-
-    // 3. Ricarica calendario
-    await fetchLessons()
-
-    // 4. Chiudi modal
-    closeModal()
-
-  } catch (error: any) {
-    console.error('Errore salvataggio lezione:', error)
-    setError(error.message)
-  } finally {
-    setLoading(false)
-  }
-}
-```
-
-#### Step 3.3: Modificare CalendarView - Visualizzazione Link
-
-**File:** `src/components/CalendarView.tsx`
-
-Nel modal di dettaglio lezione, aggiungi sezione Zoom:
-
-```typescript
-{/* Modal Dettaglio Lezione */}
-<div className="lesson-detail-modal">
-  <h3>{selectedEvent.title}</h3>
-  <p><strong>Docente:</strong> {selectedEvent.teacher_name}</p>
-  <p><strong>Orario:</strong> {selectedEvent.start_time} - {selectedEvent.end_time}</p>
-  <p><strong>Aula:</strong> {selectedEvent.room}</p>
-
-  {/* SEZIONE ZOOM */}
-  {selectedEvent.isHybrid && (
-    <div className="zoom-section mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-      <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-        <i className="fas fa-video mr-2"></i>
-        Lezione Online
-      </h4>
-
-      {selectedEvent.zoom_link ? (
-        // Link Zoom pronto
-        <div className="space-y-3">
-          <div className="flex items-center text-green-600 text-sm">
-            <i className="fas fa-check-circle mr-2"></i>
-            <span>Link Zoom pronto</span>
-          </div>
-
-          {/* Link per studenti */}
-          <div>
-            <label className="text-xs text-gray-600 block mb-1">
-              Link per Studenti:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={selectedEvent.zoom_link}
-                readOnly
-                className="flex-1 px-3 py-2 text-sm border rounded bg-white"
-              />
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(selectedEvent.zoom_link!)
-                  alert('Link copiato!')
-                }}
-                className="btn-secondary"
-              >
-                <i className="fas fa-copy"></i>
-              </button>
-            </div>
-          </div>
-
-          {/* Link per docente */}
-          {selectedEvent.zoom_host_link && (
-            <div>
-              <label className="text-xs text-gray-600 block mb-1">
-                Link Host (Docente):
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={selectedEvent.zoom_host_link}
-                  readOnly
-                  className="flex-1 px-3 py-2 text-sm border rounded bg-white"
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedEvent.zoom_host_link!)
-                    alert('Link docente copiato!')
-                  }}
-                  className="btn-secondary"
-                >
-                  <i className="fas fa-copy"></i>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Password */}
-          {selectedEvent.zoom_password && (
-            <p className="text-sm text-gray-600">
-              <strong>Password:</strong> <code className="bg-gray-100 px-2 py-1 rounded">
-                {selectedEvent.zoom_password}
-              </code>
-            </p>
-          )}
-
-          {/* Bottoni azione */}
-          <div className="flex gap-2 mt-3">
-            <a
-              href={selectedEvent.zoom_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary"
-            >
-              <i className="fas fa-external-link-alt mr-2"></i>
-              Apri Zoom
-            </a>
-
-            <button
-              onClick={() => sendZoomLinkToTeacher(selectedEvent)}
-              className="btn-secondary"
-            >
-              <i className="fas fa-envelope mr-2"></i>
-              Invia a Docente
-            </button>
-          </div>
-        </div>
-      ) : selectedEvent.zoom_error ? (
-        // Errore creazione Zoom
-        <div className="text-red-600">
-          <div className="flex items-center mb-2">
-            <i className="fas fa-exclamation-circle mr-2"></i>
-            <span>Errore creazione link</span>
-          </div>
-          <p className="text-sm bg-red-50 p-2 rounded">
-            {selectedEvent.zoom_error}
-          </p>
-          <button
-            onClick={() => retryCreateZoomMeeting(selectedEvent.supabaseId!)}
-            className="btn-primary mt-3"
-          >
-            <i className="fas fa-redo mr-2"></i>
-            Riprova
-          </button>
-        </div>
-      ) : (
-        // Link in generazione
-        <div className="text-yellow-600 flex items-center">
-          <i className="fas fa-spinner fa-spin mr-2"></i>
-          <span>Generazione link Zoom in corso...</span>
-        </div>
-      )}
-    </div>
-  )}
-</div>
-
-{/* Funzione per inviare link al docente */}
-<script>
-const sendZoomLinkToTeacher = async (lesson: CalendarEvent) => {
-  try {
-    await supabase.functions.invoke('send-email', {
-      body: {
-        to: getTeacherEmail(lesson.teacher_name),
-        subject: `Link Zoom - ${lesson.title}`,
-        html: `
-          <h2>Lezione: ${lesson.title}</h2>
-          <p><strong>Data:</strong> ${lesson.lesson_date}</p>
-          <p><strong>Orario:</strong> ${lesson.start_time} - ${lesson.end_time}</p>
-
-          <h3>Link Host (per avviare la lezione):</h3>
-          <a href="${lesson.zoom_host_link}">${lesson.zoom_host_link}</a>
-
-          <p><strong>Password:</strong> ${lesson.zoom_password || 'Nessuna'}</p>
-        `
-      }
-    })
-
-    alert('Email inviata al docente!')
-  } catch (error) {
-    alert('Errore invio email: ' + error.message)
-  }
-}
-
-const retryCreateZoomMeeting = async (lessonId: string) => {
-  setLoading(true)
-
-  const { data: lesson } = await supabase
-    .from('lessons')
-    .select('*')
-    .eq('id', lessonId)
-    .single()
-
-  const { error } = await supabase.functions.invoke('create-zoom-meeting', {
-    body: {
-      lesson_id: lesson.id,
-      title: lesson.title,
-      teacher_name: lesson.teacher_name,
-      lesson_date: lesson.lesson_date,
-      start_time: lesson.start_time,
-      end_time: lesson.end_time
-    }
-  })
-
-  if (error) {
-    alert('Errore: ' + error.message)
-  } else {
-    alert('Link Zoom creato!')
-    fetchLessons()
-  }
-
-  setLoading(false)
-}
-</script>
-```
-
-#### Step 3.4: Modificare CalendarWizard - Batch Creation
-
-**File:** `src/components/CalendarWizard.tsx`
-
-```typescript
-const handleGenerateCalendar = async () => {
-  setLoading(true)
-  setError(null)
-
-  try {
-    // 1. Genera array lezioni ricorrenti
-    const generatedLessons = generateRecurringLessons(formData)
-
-    console.log(`Generating ${generatedLessons.length} lessons...`)
-
-    // 2. Salva tutte nel database
-    const { data: savedLessons, error: insertError } = await supabase
-      .from('lessons')
-      .insert(generatedLessons)
-      .select()
-
-    if (insertError) throw insertError
-
-    console.log(`✅ Saved ${savedLessons.length} lessons`)
-
-    // 3. Se sono ibride, crea link Zoom in batch
-    const hybridLessons = savedLessons.filter(l => l.is_hybrid)
-
-    if (hybridLessons.length > 0) {
-      setMessage(`Creazione ${hybridLessons.length} link Zoom...`)
-      setProgress({ current: 0, total: hybridLessons.length })
-
-      // Chiama batch function
-      const { data: batchResult, error: batchError } = await supabase.functions.invoke(
-        'create-zoom-meetings-batch',
-        {
-          body: {
-            lessons: hybridLessons.map(l => ({
-              id: l.id,
-              title: l.title,
-              teacher_name: l.teacher_name,
-              lesson_date: l.lesson_date,
-              start_time: l.start_time,
-              end_time: l.end_time
-            }))
-          }
-        }
-      )
-
-      if (batchError) {
-        console.error('Batch error:', batchError)
-        setMessage(`⚠️ Lezioni create ma errori nella generazione Zoom`)
-      } else {
-        console.log('Batch result:', batchResult)
-        setMessage(
-          `✅ Create ${savedLessons.length} lezioni. ` +
-          `Link Zoom: ${batchResult.created} creati, ${batchResult.failed} falliti`
-        )
-      }
-
-      // Polling per aggiornare progresso real-time
-      const pollInterval = setInterval(async () => {
-        const { count } = await supabase
-          .from('lessons')
-          .select('id', { count: 'exact', head: true })
-          .not('zoom_link', 'is', null)
-          .in('id', hybridLessons.map(l => l.id))
-
-        setProgress(prev => ({ ...prev, current: count || 0 }))
-
-        if (count === hybridLessons.length) {
-          clearInterval(pollInterval)
-        }
-      }, 2000) // Aggiorna ogni 2 secondi
-    } else {
-      setMessage(`✅ Create ${savedLessons.length} lezioni`)
-    }
-
-    // 4. Ricarica calendario
-    await fetchLessons()
-
-    // 5. Chiudi wizard
-    setTimeout(() => closeWizard(), 3000)
-
-  } catch (error: any) {
-    console.error('Error generating calendar:', error)
-    setError(error.message)
-  } finally {
-    setLoading(false)
-  }
-}
-
-// UI Progresso
-{progress.total > 0 && (
-  <div className="progress-section mt-4">
-    <p className="text-sm text-gray-600 mb-2">
-      Creazione link Zoom: {progress.current}/{progress.total}
-    </p>
-    <div className="w-full bg-gray-200 rounded-full h-2">
-      <div
-        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-        style={{ width: `${(progress.current / progress.total) * 100}%` }}
-      />
-    </div>
-  </div>
-)}
-```
-
----
-
-### FASE 4: Funzionalità Avanzate (Opzionali)
-
-#### Step 4.1: Sincronizzazione Modifica Lezione
-
-**File:** `supabase/functions/update-zoom-meeting/index.ts`
-
-```typescript
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { getZoomAccessToken, calculateDuration } from '../_shared/zoom-auth.ts'
-
-serve(async (req) => {
-  try {
-    const { meeting_id, lesson_date, start_time, end_time } = await req.json()
-
-    const zoomToken = await getZoomAccessToken()
-    const duration = calculateDuration(start_time, end_time)
-
-    // PATCH meeting esistente
-    const response = await fetch(
-      `https://api.zoom.us/v2/meetings/${meeting_id}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${zoomToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          start_time: `${lesson_date}T${start_time}:00`,
-          duration
+        if (updateError) throw updateError
+
+        console.log(`✅ Saved recording for lesson ${lesson.id}`)
+        fetched++
+
+        // TODO: Invia email agli studenti del corso con il link
+        // await sendRecordingEmail(lesson, recordingData.share_url)
+
+      } catch (error) {
+        console.error(`❌ Failed to fetch recording for lesson ${lesson.id}:`, error.message)
+        failed++
+        errors.push({
+          lesson_id: lesson.id,
+          zoom_meeting_id: lesson.zoom_meeting_id,
+          error: error.message
         })
       }
-    )
-
-    if (!response.ok) {
-      throw new Error(await response.text())
     }
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 })
+    console.log(`📊 Results: ${fetched} fetched, ${notFound} not found, ${failed} failed`)
 
-  } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500 }
-    )
-  }
-})
-```
-
-**Trigger Database:**
-
-```sql
--- supabase/migrations/20260218_trigger_zoom_sync.sql
-
-CREATE OR REPLACE FUNCTION sync_zoom_meeting_update()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Se cambia data/orario di lezione ibrida con meeting Zoom
-  IF NEW.is_hybrid = true
-     AND NEW.zoom_meeting_id IS NOT NULL
-     AND (NEW.lesson_date != OLD.lesson_date
-          OR NEW.start_time != OLD.start_time
-          OR NEW.end_time != OLD.end_time) THEN
-
-    -- Chiama Edge Function per aggiornare Zoom
-    PERFORM net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/update-zoom-meeting',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body := jsonb_build_object(
-        'meeting_id', NEW.zoom_meeting_id,
-        'lesson_date', NEW.lesson_date,
-        'start_time', NEW.start_time,
-        'end_time', NEW.end_time
-      )
-    );
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_sync_zoom_update
-AFTER UPDATE ON lessons
-FOR EACH ROW
-EXECUTE FUNCTION sync_zoom_meeting_update();
-```
-
-#### Step 4.2: Cancellazione Meeting Zoom
-
-**File:** `supabase/functions/delete-zoom-meeting/index.ts`
-
-```typescript
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { getZoomAccessToken } from '../_shared/zoom-auth.ts'
-
-serve(async (req) => {
-  try {
-    const { meeting_id } = await req.json()
-
-    const zoomToken = await getZoomAccessToken()
-
-    // DELETE meeting
-    const response = await fetch(
-      `https://api.zoom.us/v2/meetings/${meeting_id}`,
+      JSON.stringify({
+        success: true,
+        processed: lessons.length,
+        fetched,
+        notFound,
+        failed,
+        errors: errors.length > 0 ? errors : undefined
+      }),
       {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${zoomToken}`
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       }
     )
 
-    if (!response.ok && response.status !== 404) {
-      // 404 = meeting già cancellato, OK
-      throw new Error(await response.text())
-    }
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 })
-
   } catch (error) {
+    console.error('❌ Fetch recordings job error:', error)
+
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500 }
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     )
   }
 })
 ```
 
-**Trigger Database:**
+**Configurazione:** `supabase/functions/fetch-zoom-recordings/deno.json`
 
-```sql
-CREATE OR REPLACE FUNCTION delete_zoom_meeting()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF OLD.zoom_meeting_id IS NOT NULL THEN
-    PERFORM net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/delete-zoom-meeting',
-      headers := jsonb_build_object('Content-Type', 'application/json'),
-      body := jsonb_build_object('meeting_id', OLD.zoom_meeting_id)
-    );
-  END IF;
+```json
+{
+  "imports": {}
+}
+```
 
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
+### Step 2.4: Configurazione in config.toml
 
-CREATE TRIGGER trigger_delete_zoom_meeting
-BEFORE DELETE ON lessons
-FOR EACH ROW
-EXECUTE FUNCTION delete_zoom_meeting();
+Aggiungi le nuove funzioni in `supabase/config.toml`:
+
+```toml
+[functions.create-zoom-links-scheduled]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-zoom-links-scheduled/deno.json"
+entrypoint = "./functions/create-zoom-links-scheduled/index.ts"
+
+[functions.cleanup-zoom-meetings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/cleanup-zoom-meetings/deno.json"
+entrypoint = "./functions/cleanup-zoom-meetings/index.ts"
+
+[functions.fetch-zoom-recordings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/fetch-zoom-recordings/deno.json"
+entrypoint = "./functions/fetch-zoom-recordings/index.ts"
+```
+
+### Step 2.5: Deploy Edge Functions
+
+```bash
+npx supabase@latest functions deploy create-zoom-links-scheduled
+npx supabase@latest functions deploy cleanup-zoom-meetings
+npx supabase@latest functions deploy fetch-zoom-recordings
 ```
 
 ---
 
-## Gestione Insidie
+## FASE 3: Configurazione Cron Jobs
 
-### 1. Rate Limiting Zoom (10 richieste/secondo)
+### Step 3.1: Crea Cron Jobs in Supabase
 
-**Problema:** Creazione batch di centinaia di lezioni può superare il limite.
+Esegui nel **SQL Editor**:
 
-**Soluzione Implementata:**
-- Batch di 8 meeting alla volta (sotto il limite di 10)
-- Delay di 1 secondo tra batch
-- Tempo stimato: ~1.500 lezioni in 3 minuti
-
-**Monitoraggio:**
-```typescript
-// Log in Edge Function
-console.log(`Batch ${batchNumber}/${totalBatches}`)
-console.log(`Rate: ${BATCH_SIZE} requests per ${DELAY_MS}ms`)
-```
-
-### 2. Errori API Zoom
-
-**Problema:** Network timeout, errori 500, credenziali scadute.
-
-**Soluzione Implementata:**
-- Retry con exponential backoff (2s, 4s, 8s)
-- Salvataggio errore nel database (campo `zoom_error`)
-- Contatore tentativi (`zoom_retry_count`)
-- Funzione "Riprova" nell'UI
-
-**Esempio errore salvato:**
 ```sql
-SELECT id, title, zoom_error
-FROM lessons
-WHERE zoom_error IS NOT NULL;
+-- ============================================
+-- CRON JOB 1: Crea link Zoom 45 minuti prima
+-- Esecuzione: Ogni 5 minuti
+-- ============================================
 
--- Output:
--- id | title | zoom_error
--- 123 | Pianoforte | Zoom API: Invalid access token
+SELECT cron.schedule(
+  'create-zoom-links-45min-before',
+  '*/5 * * * *', -- Ogni 5 minuti
+  $$
+  SELECT
+    net.http_post(
+      url := 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/create-zoom-links-scheduled',
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      body := '{}'::jsonb
+    ) AS request_id;
+  $$
+);
+
+-- ============================================
+-- CRON JOB 2: Cleanup meeting terminati
+-- Esecuzione: Ogni ora
+-- ============================================
+
+SELECT cron.schedule(
+  'cleanup-zoom-meetings-hourly',
+  '0 * * * *', -- All'inizio di ogni ora (00:00, 01:00, 02:00...)
+  $$
+  SELECT
+    net.http_post(
+      url := 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/cleanup-zoom-meetings',
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      body := '{}'::jsonb
+    ) AS request_id;
+  $$
+);
+
+-- ============================================
+-- CRON JOB 3: Recupera registrazioni
+-- Esecuzione: Ogni notte alle 02:00
+-- ============================================
+
+SELECT cron.schedule(
+  'fetch-zoom-recordings-nightly',
+  '0 2 * * *', -- Ogni giorno alle 02:00
+  $$
+  SELECT
+    net.http_post(
+      url := 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/fetch-zoom-recordings',
+      headers := '{"Content-Type": "application/json"}'::jsonb,
+      body := '{}'::jsonb
+    ) AS request_id;
+  $$
+);
 ```
 
-### 3. Lezioni Create a Inizio Anno
+### Step 3.2: Verifica Cron Jobs
 
-**Problema:** 1.500 lezioni create a settembre per tutto l'anno.
+```sql
+-- Vedi tutti i cron job attivi
+SELECT * FROM cron.job;
 
-**Limiti Zoom:**
-- ✅ Anticipo massimo: 365 giorni (OK)
-- ✅ Meeting schedulati: illimitati (Piano Pro)
-- ⚠️ Rate limiting: 10/sec (gestito con batch)
-
-**Strategia:**
-1. Generazione batch all'inizio anno scolastico
-2. Progresso UI in tempo reale
-3. Report finale con eventuali errori
-4. Possibilità di rigenerare singole lezioni fallite
-
-**Best Practice:**
-```typescript
-// Genera solo lezioni fino a fine anno scolastico (giugno)
-// Non oltre 12 mesi
-const endDate = new Date('2027-06-30')
-const startDate = new Date('2026-09-01')
-const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24)
-
-if (diffDays > 365) {
-  alert('Attenzione: Zoom permette max 365 giorni in anticipo')
-}
+-- Output atteso:
+-- jobid | schedule      | command                              | jobname
+-- ------|---------------|--------------------------------------|---------------------------
+-- 1     | */5 * * * *   | SELECT net.http_post(...)            | create-zoom-links-45min-before
+-- 2     | 0 * * * *     | SELECT net.http_post(...)            | cleanup-zoom-meetings-hourly
+-- 3     | 0 2 * * *     | SELECT net.http_post(...)            | fetch-zoom-recordings-nightly
 ```
 
-### 4. Timezone Italia
+### Step 3.3: Monitora esecuzioni
 
-**Problema:** Disallineamento orari per cambio ora legale/solare.
-
-**Soluzione:**
-- Sempre specificare `timezone: 'Europe/Rome'` in API Zoom
-- Zoom gestisce automaticamente DST (Daylight Saving Time)
-- Non convertire manualmente in UTC
-
-**Esempio:**
-```javascript
-// ✅ CORRETTO
-{
-  start_time: "2026-03-29T10:00:00", // 29 marzo, cambio ora legale
-  timezone: "Europe/Rome" // Zoom sa che alle 2:00 diventa 3:00
-}
-
-// ❌ SBAGLIATO
-{
-  start_time: "2026-03-29T09:00:00Z" // UTC, ignora timezone locale
-}
+```sql
+-- Vedi storico esecuzioni cron (ultime 10)
+SELECT
+  jobid,
+  runid,
+  job_name,
+  status,
+  return_message,
+  start_time,
+  end_time
+FROM cron.job_run_details
+ORDER BY start_time DESC
+LIMIT 10;
 ```
 
-### 5. Account Host Unico
+---
 
-**Problema:** Tutti i meeting sono sul tuo account, non del docente.
+## FASE 4: Scope Zoom per Registrazioni
 
-**Soluzione Scelta: Account Unico**
-- Tutti i meeting creati sul tuo account NAM Maestro
-- Docente riceve `zoom_host_link` (start URL) via email
-- Docente clicca link → diventa host della lezione
-- Studenti usano `zoom_link` (join URL)
+### Step 4.1: Aggiungi Scope Registrazioni
 
-**Alternativa Futura: Multi-Account**
-- Ogni docente ha account Zoom Pro
-- Aggiungi campo `teacher_zoom_email` al DB
-- Crea meeting su account specifico docente:
-  ```typescript
-  fetch(`https://api.zoom.us/v2/users/${teacher.zoom_email}/meetings`, ...)
-  ```
-
-**Costi confronto:**
-- Account unico: €15/mese
-- 10 docenti multi-account: €150/mese
-
-**Raccomandazione:** Inizia con account unico, valuta multi-account se necessario.
+1. Vai su [marketplace.zoom.us](https://marketplace.zoom.us)
+2. **Manage** → La tua app **NAM Maestro Integration**
+3. Tab **Scopes**
+4. Aggiungi:
+   - `recording:read:admin`
+   - `recording:read:list_user_recordings:admin`
+5. **Save** e riattiva se richiesto
 
 ---
 
 ## Testing
 
-### Test Checklist
+### Test 1: Creazione Manuale Link (Simula Cron)
 
-#### Test Unitari Edge Functions
+Testa l'Edge Function manualmente prima di aspettare il cron:
 
 ```bash
-# Test autenticazione Zoom
-curl -X POST https://your-project.supabase.co/functions/v1/create-zoom-meeting \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "lesson_id": "test-123",
-    "title": "Test Pianoforte",
-    "teacher_name": "Mario Rossi",
-    "lesson_date": "2026-03-01",
-    "start_time": "10:00",
-    "end_time": "11:00"
-  }'
-
-# Risposta attesa:
-# {
-#   "success": true,
-#   "meeting_id": 87654321098,
-#   "join_url": "https://zoom.us/j/87654321098?pwd=...",
-#   "start_url": "https://zoom.us/s/87654321098?zak=..."
-# }
+curl -X POST 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/create-zoom-links-scheduled' \
+  -H 'Content-Type: application/json'
 ```
 
-#### Test Frontend
+**Verifica:**
+- Crea una lezione ibrida che inizia tra 40-50 minuti
+- Esegui il comando sopra
+- Controlla che il link Zoom sia stato creato nel database
+- Verifica su zoom.us che il meeting esista
 
-- [ ] **Creazione Lezione Singola Ibrida**
-  1. Apri calendario
-  2. Click "Nuova Lezione"
-  3. Compila form
-  4. Spunta "Lezione Ibrida"
-  5. Salva
-  6. Verifica spinner "Creazione link Zoom..."
-  7. Verifica messaggio "✅ Lezione creata con link Zoom"
-  8. Click sulla lezione
-  9. Verifica visualizzazione link Zoom
+### Test 2: Cleanup Manuale
 
-- [ ] **Creazione Lezione Singola NON Ibrida**
-  1. Crea lezione senza spuntare "Lezione Ibrida"
-  2. Verifica che NON appaia sezione Zoom
-  3. Verifica che `zoom_link` sia NULL nel DB
+```bash
+curl -X POST 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/cleanup-zoom-meetings' \
+  -H 'Content-Type: application/json'
+```
 
-- [ ] **Calendar Wizard - Batch 7 Lezioni**
-  1. Apri Calendar Wizard
-  2. Genera 7 lezioni ricorrenti
-  3. Spunta "Lezioni Ibride"
-  4. Click "Genera"
-  5. Verifica barra progresso
-  6. Verifica messaggio finale "7 creati, 0 falliti"
-  7. Controlla calendario: tutte e 7 hanno link Zoom
+**Verifica:**
+- Il comando trova lezioni terminate da 3+ ore
+- Cancella i meeting su Zoom
+- Rimuove `zoom_meeting_id` dal database
 
-- [ ] **Gestione Errori**
-  1. Disabilita temporaneamente secrets Zoom
-  2. Crea lezione ibrida
-  3. Verifica messaggio errore
-  4. Verifica che `zoom_error` contenga messaggio
-  5. Click "Riprova"
-  6. Riabilita secrets
-  7. Verifica creazione link
+### Test 3: Fetch Registrazioni Manuale
 
-- [ ] **Copia Link**
-  1. Click su lezione ibrida
-  2. Click "Copia Link"
-  3. Verifica alert "Link copiato"
-  4. Incolla in browser
-  5. Verifica apertura pagina Zoom
+```bash
+curl -X POST 'https://kjhynvbwoptdznzordvu.supabase.co/functions/v1/fetch-zoom-recordings' \
+  -H 'Content-Type: application/json'
+```
 
-- [ ] **Invio Email Docente**
-  1. Click "Invia a Docente"
-  2. Verifica email ricevuta
-  3. Controlla presenza `zoom_host_link`
-  4. Click link → verifica apertura Zoom come host
+**Verifica:**
+- Trova lezioni di ieri/oggi con meeting
+- Recupera registrazioni da Zoom
+- Salva `recording_url` nel database
 
-#### Test Database
+### Test 4: Verifica Cron Automatico
+
+1. **Crea lezione di test** che inizia tra 45 minuti esatti
+2. **Aspetta 5-10 minuti** (tempo tra esecuzioni cron)
+3. **Controlla database** se il link è stato creato:
 
 ```sql
--- Verifica campi Zoom aggiunti
-\d lessons
-
--- Verifica lezioni con link Zoom
-SELECT id, title, zoom_meeting_id, zoom_link
+SELECT id, title, lesson_date, start_time, zoom_link, zoom_created_at
 FROM lessons
-WHERE is_hybrid = true
-LIMIT 5;
-
--- Verifica lezioni con errori
-SELECT id, title, zoom_error, zoom_retry_count
-FROM lessons
-WHERE zoom_error IS NOT NULL;
-
--- Conta lezioni ibride con/senza link
-SELECT
-  COUNT(*) FILTER (WHERE zoom_link IS NOT NULL) as con_link,
-  COUNT(*) FILTER (WHERE zoom_link IS NULL) as senza_link
-FROM lessons
-WHERE is_hybrid = true;
+WHERE lesson_date = CURRENT_DATE
+AND start_time > NOW()::time
+AND is_hybrid = true
+ORDER BY start_time;
 ```
 
-#### Test Performance
-
-- [ ] **Batch 100 Lezioni**
-  - Crea 100 lezioni ibride
-  - Tempo atteso: ~12 secondi (100/8 batch * 1sec)
-  - Verifica: 100 link creati
-
-- [ ] **Batch 1.000 Lezioni**
-  - Crea 1.000 lezioni ibride
-  - Tempo atteso: ~2 minuti
-  - Verifica: nessun errore rate limiting
-  - Verifica: progresso UI funzionante
+4. **Verifica su Zoom** che il meeting esista
 
 ---
 
 ## Troubleshooting
 
-### Problema: "Zoom credentials not configured"
+### ❌ Cron non si attiva
 
-**Causa:** Secrets non impostati in Supabase.
+**Problema:** Il job cron non esegue la funzione.
 
-**Soluzione:**
-```bash
-# Verifica secrets
-supabase secrets list
-
-# Se mancano, aggiungi
-supabase secrets set ZOOM_ACCOUNT_ID="..."
-supabase secrets set ZOOM_CLIENT_ID="..."
-supabase secrets set ZOOM_CLIENT_SECRET="..."
-
-# Redeploy function
-supabase functions deploy create-zoom-meeting
-```
-
-### Problema: "HTTP 401 Unauthorized" da Zoom
-
-**Causa:** Credenziali Zoom sbagliate o app non attivata.
-
-**Soluzione:**
-1. Vai su marketplace.zoom.us
-2. Verifica che l'app sia **Activated** (toggle ON)
-3. Controlla che i secrets siano corretti:
-   ```typescript
-   console.log('Account ID:', Deno.env.get('ZOOM_ACCOUNT_ID'))
-   // NON loggare Client Secret in produzione!
+**Soluzioni:**
+1. Verifica che pg_cron sia abilitato:
+   ```sql
+   SELECT * FROM pg_extension WHERE extname = 'pg_cron';
    ```
+2. Controlla log esecuzioni:
+   ```sql
+   SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 5;
+   ```
+3. Verifica che l'URL della funzione sia corretto (usa il tuo project_ref)
 
-### Problema: "HTTP 429 Too Many Requests"
+### ❌ Link non creati a 45 minuti
 
-**Causa:** Superato rate limit Zoom (10 richieste/secondo).
+**Problema:** Le lezioni non ricevono link Zoom.
 
-**Soluzione:**
-- Verifica che `BATCH_SIZE = 8` (non 10+)
-- Verifica che `DELAY_MS = 1000` (1 secondo)
-- In Edge Function batch, aggiungi log:
-  ```typescript
-  console.log(`Batch ${i}: waiting ${DELAY_MS}ms...`)
-  ```
+**Soluzioni:**
+1. **Testa manualmente** l'Edge Function:
+   ```bash
+   curl -X POST 'https://[project].supabase.co/functions/v1/create-zoom-links-scheduled'
+   ```
+2. Controlla i **log della funzione** nella Dashboard Supabase
+3. Verifica che la finestra temporale (40-50 min) sia corretta
+4. Controlla timezone: la lezione deve essere in UTC corretto
 
-### Problema: Link Zoom generato ma non appare nell'UI
+### ❌ Registrazioni non recuperate
 
-**Causa:** Manca refresh calendario o subscription real-time.
+**Problema:** `recording_url` rimane NULL.
 
-**Soluzione:**
-```typescript
-// CalendarView.tsx - Aggiungi subscription
-useEffect(() => {
-  const subscription = supabase
-    .channel('lessons-updates')
-    .on('postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'lessons' },
-      (payload) => {
-        console.log('Lesson updated:', payload.new)
-        fetchLessons() // Ricarica automaticamente
-      }
-    )
-    .subscribe()
+**Soluzioni:**
+1. Verifica **scope Zoom**: `recording:read:admin`
+2. Zoom impiega **alcune ore** dopo la lezione per processare la registrazione
+3. Prova a rilanciare il job la sera o il giorno dopo
+4. Controlla che la registrazione sia abilitata (`auto_recording: 'cloud'`)
 
-  return () => subscription.unsubscribe()
-}, [])
-```
+### ❌ Troppi meeting Zoom aperti
 
-### Problema: Timezone sbagliato (meeting 1 ora prima/dopo)
+**Problema:** Dashboard Zoom piena di meeting vecchi.
 
-**Causa:** Mancata specifica `timezone: 'Europe/Rome'`.
+**Soluzioni:**
+1. Il cleanup gira **ogni ora**, aspetta la prossima esecuzione
+2. Esegui **manualmente** il cleanup:
+   ```bash
+   curl -X POST 'https://[project].supabase.co/functions/v1/cleanup-zoom-meetings'
+   ```
+3. Riduci il timeout da 3 ore a 1 ora modificando il codice della funzione
 
-**Soluzione:**
-```typescript
-// Verifica payload Zoom
-const meetingPayload = {
-  start_time: `${lesson_date}T${start_time}:00`,
-  timezone: 'Europe/Rome' // ← DEVE ESSERCI
-}
-```
+---
 
-### Problema: Docente non riesce ad avviare meeting
+## Monitoraggio e Manutenzione
 
-**Causa:** Usa `join_url` invece di `start_url`.
+### 📊 Dashboard Monitoring
 
-**Soluzione:**
-- Invia al docente `zoom_host_link` (start URL), NON `zoom_link`
-- Verifica email template:
-  ```html
-  <h3>Link Host (per avviare lezione):</h3>
-  <a href="${lesson.zoom_host_link}">Avvia Lezione</a>
+Crea una query per monitorare lo stato del sistema:
 
-  <h3>Link Studenti (da condividere):</h3>
-  <a href="${lesson.zoom_link}">Accedi Lezione</a>
-  ```
-
-### Problema: Meeting Zoom non si cancella quando elimini lezione
-
-**Causa:** Trigger `delete_zoom_meeting` non attivo.
-
-**Soluzione:**
 ```sql
--- Verifica trigger
-SELECT * FROM information_schema.triggers
-WHERE trigger_name = 'trigger_delete_zoom_meeting';
+-- Statistiche giornaliere Zoom
+SELECT
+  lesson_date,
+  COUNT(*) as total_hybrid_lessons,
+  COUNT(zoom_meeting_id) as with_active_meeting,
+  COUNT(zoom_link) as with_link,
+  COUNT(recording_url) as with_recording
+FROM lessons
+WHERE is_hybrid = true
+AND lesson_date >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY lesson_date
+ORDER BY lesson_date DESC;
+```
 
--- Se mancante, crea trigger (vedi Step 4.2)
+### 🔔 Alert su Errori
+
+Monitora lezioni con errori:
+
+```sql
+SELECT id, title, lesson_date, start_time, zoom_error
+FROM lessons
+WHERE zoom_error IS NOT NULL
+AND lesson_date >= CURRENT_DATE
+ORDER BY lesson_date, start_time;
+```
+
+### 🧹 Pulizia Database (Opzionale)
+
+Dopo 30 giorni, svuota campi Zoom di lezioni vecchie:
+
+```sql
+-- Cron job mensile per pulizia storico
+SELECT cron.schedule(
+  'cleanup-old-zoom-data',
+  '0 3 1 * *', -- Primo giorno del mese alle 03:00
+  $$
+  UPDATE lessons
+  SET
+    zoom_meeting_id = NULL,
+    zoom_link = NULL,
+    zoom_host_link = NULL,
+    zoom_password = NULL
+  WHERE lesson_date < CURRENT_DATE - INTERVAL '30 days';
+  $$
+);
 ```
 
 ---
 
 ## Checklist Finale
 
-### Pre-Deploy
+### ✅ Setup Completato
 
-- [ ] Account Zoom Pro attivo
-- [ ] App Zoom creata su marketplace
-- [ ] Credenziali Zoom copiate (Account ID, Client ID, Client Secret)
-- [ ] Secrets configurati in Supabase
-- [ ] Migration database eseguita (`zoom_*` campi aggiunti)
-- [ ] Edge Functions deployate
-- [ ] Frontend modificato (CalendarView, CalendarWizard, types)
-- [ ] Testing completato su ambiente di sviluppo
+- [ ] Campi registrazioni aggiunti alla tabella `lessons`
+- [ ] pg_cron abilitato
+- [ ] 3 Edge Functions create e deployate
+- [ ] 3 Cron Jobs schedulati
+- [ ] Scope Zoom `recording:read:admin` aggiunto
+- [ ] Test manuale funzioni → OK
+- [ ] Test automatico cron → Attendi 45 min e verifica
 
-### Post-Deploy
+### ✅ Verifica Funzionamento
 
-- [ ] Test creazione lezione singola ibrida in produzione
-- [ ] Test batch 10 lezioni
-- [ ] Verifica email invio link a docente funzionante
-- [ ] Verifica app studenti visualizza link Zoom
-- [ ] Monitoraggio errori per 24h
-- [ ] Backup database pre-migrazione salvato
-
-### Documentazione
-
-- [ ] README aggiornato con sezione Zoom
-- [ ] Documentazione per segreteria (come creare lezioni ibride)
-- [ ] Documentazione per docenti (come usare link host)
-- [ ] Procedura recupero errori (riprova creazione link)
-
-### Manutenzione
-
-- [ ] Monitoring settimanale lezioni con `zoom_error`
-- [ ] Verifica mensile scadenza credenziali Zoom
-- [ ] Backup lista meeting Zoom (export da dashboard Zoom)
-- [ ] Aggiornamento Edge Functions se Zoom cambia API
+1. **Crea lezione test** che inizia tra 45 minuti
+2. **Aspetta 5-10 minuti** (cron esegue)
+3. **Controlla database**: `zoom_link` presente?
+4. **Verifica Zoom**: meeting visibile?
+5. **Dopo 3h dalla fine**: meeting cancellato?
+6. **Giorno dopo**: registrazione recuperata?
 
 ---
 
-## Riepilogo Costi
+## 🎉 Sistema Completo
 
-| Voce | Costo Mensile | Note |
-|------|---------------|------|
-| Zoom Pro | €13-15 | Piano base, meeting 30h |
-| Supabase | €0 | Edge Functions gratis fino a 2M invocazioni |
-| **TOTALE** | **€13-15** | Per account unico |
+Una volta completato, il sistema funziona completamente in automatico:
 
-**Multi-account (futuro):**
-- 10 docenti × €15 = €150/mese
-- Considerare solo se necessario
-
----
-
-## Contatti e Supporto
-
-### Risorse Utili
-
-- **Zoom API Docs:** https://developers.zoom.us/docs/api/
-- **Supabase Edge Functions:** https://supabase.com/docs/guides/functions
-- **Supabase Secrets:** https://supabase.com/docs/guides/functions/secrets
-
-### Debugging
-
-```typescript
-// Abilitare log dettagliati in Edge Function
-console.log('=== ZOOM DEBUG ===')
-console.log('Lesson ID:', lesson_id)
-console.log('Meeting payload:', JSON.stringify(meetingPayload, null, 2))
-console.log('Zoom response:', await response.text())
+```
+📅 Lezione schedulata
+    ↓
+⏰ -45 min → 🎥 Link Zoom creato automaticamente
+    ↓
+👨‍🏫 Lezione si svolge (registrata su cloud)
+    ↓
+⏰ +3h → 🗑️ Meeting Zoom cancellato automaticamente
+    ↓
+⏰ 02:00 notte → 📹 Registrazione recuperata e salvata
+    ↓
+📧 Email inviata agli studenti con link registrazione
 ```
 
+**Zero intervento manuale richiesto!** ✨
+
 ---
 
-**Data creazione documento:** 18 Febbraio 2026
-**Versione:** 1.0
+**Data aggiornamento:** 24 Febbraio 2026
+**Versione:** 2.0 (Just-in-Time System)
 **Autore:** Claude Code Assistant
 **Progetto:** NAM Maestro - Gestionale Scuola Musica
