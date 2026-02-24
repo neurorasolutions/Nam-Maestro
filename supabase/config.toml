@@ -415,3 +415,27 @@ entrypoint = "./functions/send-push/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/send-push/*.html" ]
+
+[functions.create-zoom-meeting]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-zoom-meeting/deno.json"
+entrypoint = "./functions/create-zoom-meeting/index.ts"
+
+[functions.create-zoom-meetings-batch]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-zoom-meetings-batch/deno.json"
+entrypoint = "./functions/create-zoom-meetings-batch/index.ts"
+
+[functions.update-zoom-meeting]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-zoom-meeting/deno.json"
+entrypoint = "./functions/update-zoom-meeting/index.ts"
+
+[functions.delete-zoom-meeting]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-zoom-meeting/deno.json"
+entrypoint = "./functions/delete-zoom-meeting/index.ts"

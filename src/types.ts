@@ -25,6 +25,15 @@ export interface Event {
   type: 'lesson' | 'collective' | 'exam' | 'other';
   time: string;
   isHybrid?: boolean;
+
+  // Campi Zoom per lezioni ibride
+  zoom_meeting_id?: string;
+  zoom_link?: string;
+  zoom_host_link?: string;
+  zoom_password?: string;
+  zoom_created_at?: string;
+  zoom_error?: string;
+  zoom_retry_count?: number;
 }
 
 export interface Payment {

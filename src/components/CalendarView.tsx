@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { EVENTS, TEACHERS_LIST, ROOMS_LIST, COURSES_LIST, MAIN_COURSES, COURSE_SUBJECTS } from '../constants';
+import { EVENTS, TEACHERS_LIST, ROOMS_LIST, COURSES_LIST } from '../constants';
+import type { StudyPlan, StudyPlanSubject } from '../types';
 
 // Interface helper specifically for the view state
 interface CalendarEvent {
@@ -11,6 +12,19 @@ interface CalendarEvent {
   time: string; // Format "HH:mm - HH:mm"
   isHybrid?: boolean;
   date: Date;
+
+  // Campi Zoom
+  zoom_meeting_id?: string;
+  zoom_link?: string;
+  zoom_host_link?: string;
+  zoom_password?: string;
+  zoom_created_at?: string;
+  zoom_error?: string;
+  zoom_retry_count?: number;
+
+  // Extra fields
+  supabaseId?: string;
+  courseName?: string;
 }
 
 // AI Context Interface to store partial data between prompts
@@ -41,6 +55,10 @@ const CalendarView: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Dynamic Study Plans & Subjects (loaded from database)
+  const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+  const [planSubjects, setPlanSubjects] = useState<Record<string, StudyPlanSubject[]>>({});
+
   // Fetch lessons from Supabase on mount
   useEffect(() => {
     const fetchLessons = async () => {
@@ -62,6 +80,14 @@ const CalendarView: React.FC = () => {
           time: `${lesson.start_time?.slice(0, 5) || '10:00'} - ${lesson.end_time?.slice(0, 5) || '11:00'}`,
           date: new Date(lesson.lesson_date + 'T12:00:00'), // Add noon to avoid timezone shift
           isHybrid: lesson.is_hybrid || false,
+          // Campi Zoom
+          zoom_meeting_id: lesson.zoom_meeting_id,
+          zoom_link: lesson.zoom_link,
+          zoom_host_link: lesson.zoom_host_link,
+          zoom_password: lesson.zoom_password,
+          zoom_created_at: lesson.zoom_created_at,
+          zoom_error: lesson.zoom_error,
+          zoom_retry_count: lesson.zoom_retry_count,
           // Extra fields for Supabase sync
           supabaseId: lesson.id,
           courseName: lesson.course_name
@@ -78,6 +104,53 @@ const CalendarView: React.FC = () => {
     fetchLessons();
   }, []);
 
+  // Fetch Study Plans and Subjects from Supabase
+  useEffect(() => {
+    const fetchStudyPlansAndSubjects = async () => {
+      try {
+        // 1. Carica tutti i piani di studio attivi
+        const { data: plans, error: plansError } = await supabase
+          .from('study_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+
+        if (plansError) throw plansError;
+
+        setStudyPlans(plans || []);
+
+        // 2. Carica tutte le materie dei piani di studio
+        const { data: subjects, error: subjectsError } = await supabase
+          .from('study_plan_subjects')
+          .select('*')
+          .order('order_index', { ascending: true });
+
+        if (subjectsError) throw subjectsError;
+
+        // 3. Organizza le materie per piano di studi
+        const subjectsByPlan: Record<string, StudyPlanSubject[]> = {};
+        (subjects || []).forEach((subject: StudyPlanSubject) => {
+          // Trova il nome del piano di studi
+          const plan = (plans || []).find(p => p.id === subject.study_plan_id);
+          if (plan) {
+            if (!subjectsByPlan[plan.name]) {
+              subjectsByPlan[plan.name] = [];
+            }
+            subjectsByPlan[plan.name].push(subject);
+          }
+        });
+
+        setPlanSubjects(subjectsByPlan);
+        console.log('📚 Piani di studio caricati:', plans?.length);
+        console.log('📖 Materie caricate:', subjects?.length);
+      } catch (err) {
+        console.error('Errore caricamento piani di studio:', err);
+      }
+    };
+
+    fetchStudyPlansAndSubjects();
+  }, []);
+
   // Edit / Drag State
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [draggedEventId, setDraggedEventId] = useState<number | null>(null);
@@ -91,6 +164,7 @@ const CalendarView: React.FC = () => {
   const [formData, setFormData] = useState('');
   const [formStart, setFormStart] = useState('10:00');
   const [formEnd, setFormEnd] = useState('11:00');
+  const [formIsHybrid, setFormIsHybrid] = useState(false);       // Lezione ibrida con Zoom
 
   // Search filters for dropdowns
   const [mainCourseSearch, setMainCourseSearch] = useState('');
@@ -102,8 +176,8 @@ const CalendarView: React.FC = () => {
   const [isSubjectOpen, setIsSubjectOpen] = useState(false);
   const [isTeacherOpen, setIsTeacherOpen] = useState(false);
 
-  // Computed: available subjects based on selected main course
-  const availableSubjects = formMainCourse ? (COURSE_SUBJECTS[formMainCourse] || []) : [];
+  // Computed: available subjects based on selected main course (from database)
+  const availableSubjects = formMainCourse ? (planSubjects[formMainCourse] || []) : [];
 
   useEffect(() => {
     const year = currentDate.getFullYear();
@@ -130,6 +204,10 @@ const CalendarView: React.FC = () => {
   const [manualTab, setManualTab] = useState<'single' | 'course' | 'carnet' | 'recovery'>('single');
 
   const [showAiModal, setShowAiModal] = useState(false);
+
+  // Modal Dettaglio Lezione
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -489,16 +567,41 @@ const CalendarView: React.FC = () => {
   };
 
   // --- STANDARD RENDER LOGIC (Unchanged) ---
+  const handleEventClick = (e: React.MouseEvent, event: CalendarEvent) => {
+    e.stopPropagation();
+    setSelectedEvent(event);
+    setShowDetailModal(true);
+  };
+
   const handleEventDoubleClick = (e: React.MouseEvent, event: CalendarEvent) => {
     e.stopPropagation();
+    // Apri modal dettaglio (che include il pulsante Modifica)
+    setSelectedEvent(event);
+    setShowDetailModal(true);
+  };
+
+  const handleEditFromDetail = (event: CalendarEvent) => {
+    // Prepara il form per la modifica
     setEditingEventId(event.id);
     const parts = event.title.split(' - ');
-    const course = parts[0] || '';
+    const subject = parts[0] || ''; // La materia è la prima parte del titolo
     const teacher = parts.length > 1 ? parts[1] : '';
     const [start, end] = event.time.split('-').map(t => t.trim());
-    setFormCourse(course);
+
+    // Imposta Corso Principale (dal campo courseName)
+    if (event.courseName) {
+      setFormMainCourse(event.courseName);
+    }
+
+    // Imposta Materia
+    setFormSubject(subject);
+
+    // Legacy fields
+    setFormCourse(subject);
     setFormTeacher(teacher);
     setFormRoom(event.room);
+    setFormIsHybrid(event.isHybrid || false);
+
     const year = event.date.getFullYear();
     const month = (event.date.getMonth() + 1).toString().padStart(2, '0');
     const day = event.date.getDate().toString().padStart(2, '0');
@@ -529,7 +632,7 @@ const CalendarView: React.FC = () => {
       lesson_date: lessonDateStr,
       start_time: formStart,
       end_time: formEnd,
-      is_hybrid: false
+      is_hybrid: formIsHybrid
     };
 
     try {
@@ -548,7 +651,9 @@ const CalendarView: React.FC = () => {
           title: `${formSubject} - ${formTeacher}`,
           room: formRoom,
           time: `${formStart} - ${formEnd}`,
-          date: eventDate
+          date: eventDate,
+          isHybrid: formIsHybrid,
+          courseName: formMainCourse
         } : ev));
       } else {
         // INSERT new lesson
@@ -560,6 +665,38 @@ const CalendarView: React.FC = () => {
 
         if (error) throw error;
 
+        console.log('Lezione salvata:', data.id);
+
+        // Se è ibrida, crea link Zoom automaticamente
+        if (formIsHybrid) {
+          try {
+            const { data: zoomData, error: zoomError } = await supabase.functions.invoke(
+              'create-zoom-meeting',
+              {
+                body: {
+                  lesson_id: data.id,
+                  title: formSubject,
+                  teacher_name: formTeacher,
+                  lesson_date: lessonDateStr,
+                  start_time: formStart,
+                  end_time: formEnd
+                }
+              }
+            );
+
+            if (zoomError) {
+              console.error('Errore creazione Zoom:', zoomError);
+              alert('⚠️ Lezione creata ma link Zoom non generato. Riprova più tardi.');
+            } else {
+              console.log('Link Zoom creato:', zoomData.join_url);
+              alert('✅ Lezione creata con link Zoom');
+            }
+          } catch (zoomErr: any) {
+            console.error('Errore Zoom:', zoomErr);
+            alert('⚠️ Lezione creata ma errore nella generazione link Zoom');
+          }
+        }
+
         // Add to local state with Supabase ID
         const newEvent: CalendarEvent = {
           id: data.id,
@@ -568,7 +705,7 @@ const CalendarView: React.FC = () => {
           type: 'lesson',
           time: `${formStart} - ${formEnd}`,
           date: eventDate,
-          isHybrid: false
+          isHybrid: formIsHybrid
         };
         setEvents(prev => [...prev, newEvent]);
         setCurrentDate(eventDate);
@@ -581,6 +718,7 @@ const CalendarView: React.FC = () => {
       setFormSubject('');
       setFormCourse('');
       setFormTeacher('');
+      setFormIsHybrid(false);
       setMainCourseSearch('');
       setSubjectSearch('');
       setTeacherSearch('');
@@ -590,11 +728,27 @@ const CalendarView: React.FC = () => {
     }
   };
 
-  const handleDeleteEvent = () => {
+  const handleDeleteEvent = async () => {
     if (editingEventId) {
       if (confirm("Sei sicuro di voler eliminare questa lezione? L'azione è irreversibile.")) {
-        setEvents(prev => prev.filter(e => e.id !== editingEventId));
-        closeManualModal();
+        try {
+          // Cancella dal database (questo attiva il trigger per cancellare Zoom)
+          const { error } = await supabase
+            .from('lessons')
+            .delete()
+            .eq('id', editingEventId);
+
+          if (error) throw error;
+
+          console.log('Lezione cancellata dal DB (trigger Zoom attivato)');
+
+          // Rimuovi dalla UI
+          setEvents(prev => prev.filter(e => e.id !== editingEventId));
+          closeManualModal();
+        } catch (err: any) {
+          console.error('Errore cancellazione:', err);
+          alert('Errore durante la cancellazione: ' + err.message);
+        }
       }
     }
   };
@@ -677,7 +831,7 @@ const CalendarView: React.FC = () => {
                     <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-nam-blue text-white' : 'text-gray-700'}`}>{day}</span>
                     <div className="mt-2 space-y-1">
                       {dayEvents.slice(0, 3).map((e) => (
-                        <div key={e.id} draggable onDragStart={(evt) => handleDragStart(evt, e.id)} onDoubleClick={(evt) => handleEventDoubleClick(evt, e)} className={`h-2 px-1 rounded-sm text-[8px] leading-none text-white truncate cursor-move hover:scale-105 transition-transform ${e.type === 'lesson' ? 'bg-nam-yellow' : e.type === 'collective' ? 'bg-nam-blue' : 'bg-nam-red'}`} title={e.title}>{e.title}</div>
+                        <div key={e.id} draggable onDragStart={(evt) => handleDragStart(evt, e.id)} onClick={(evt) => handleEventClick(evt, e)} onDoubleClick={(evt) => handleEventDoubleClick(evt, e)} className={`h-2 px-1 rounded-sm text-[8px] leading-none text-white truncate cursor-pointer hover:scale-105 transition-transform ${e.type === 'lesson' ? 'bg-nam-yellow' : e.type === 'collective' ? 'bg-nam-blue' : 'bg-nam-red'}`} title={e.title}>{e.title}</div>
                       ))}
                       {dayEvents.length > 3 && <div className="text-[9px] text-gray-400 font-bold pl-1">+{dayEvents.length - 3} altri</div>}
                     </div>
@@ -814,7 +968,7 @@ const CalendarView: React.FC = () => {
             <div className="w-16 flex-shrink-0 border-r border-gray-300 bg-white z-10">{hours.map(h => (<div key={h} className="border-b border-gray-300 text-sm text-gray-400 font-mono text-right pr-2 pt-1 relative" style={{ height: `${PIXELS_PER_HOUR}px` }}><span className="-top-3 relative">{h}:00</span></div>))}</div>
             <div className="flex-1 relative bg-white" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, currentDate)}>
               {hours.map(h => (<div key={h} className="border-b border-gray-300 w-full absolute pointer-events-none" style={{ top: `${(h - START_HOUR) * PIXELS_PER_HOUR}px`, height: '1px' }}></div>))}
-              {dayEvents.map(ev => { const style = getEventStyle(ev.time); return (<div key={ev.id} draggable onDragStart={(evt) => handleDragStart(evt, ev.id)} onDoubleClick={(evt) => handleEventDoubleClick(evt, ev)} className={`absolute left-2 right-4 rounded shadow-lg p-4 text-white cursor-move hover:brightness-105 transition-all ${ev.type === 'lesson' ? 'bg-nam-yellow border-l-8 border-yellow-700' : ev.type === 'collective' ? 'bg-nam-blue border-l-8 border-blue-800' : 'bg-nam-red border-l-8 border-red-800'} ${draggedEventId === ev.id ? 'opacity-40' : 'z-10'}`} style={style}><div className="font-bold text-lg">{ev.title}</div><div className="flex items-center space-x-4 mt-2 text-sm opacity-90"><span><i className="far fa-clock mr-1"></i>{ev.time}</span><span><i className="fas fa-map-marker-alt mr-1"></i>{ev.room}</span></div></div>); })}
+              {dayEvents.map(ev => { const style = getEventStyle(ev.time); return (<div key={ev.id} draggable onDragStart={(evt) => handleDragStart(evt, ev.id)} onClick={(evt) => handleEventClick(evt, ev)} onDoubleClick={(evt) => handleEventDoubleClick(evt, ev)} className={`absolute left-2 right-4 rounded shadow-lg p-4 text-white cursor-pointer hover:brightness-105 transition-all ${ev.type === 'lesson' ? 'bg-nam-yellow border-l-8 border-yellow-700' : ev.type === 'collective' ? 'bg-nam-blue border-l-8 border-blue-800' : 'bg-nam-red border-l-8 border-red-800'} ${draggedEventId === ev.id ? 'opacity-40' : 'z-10'}`} style={style}><div className="font-bold text-lg">{ev.title}</div><div className="flex items-center space-x-4 mt-2 text-sm opacity-90"><span><i className="far fa-clock mr-1"></i>{ev.time}</span><span><i className="fas fa-map-marker-alt mr-1"></i>{ev.room}</span></div></div>); })}
             </div>
           </div>
         </div>
@@ -918,22 +1072,23 @@ const CalendarView: React.FC = () => {
                       />
                       {isMainCourseOpen && (
                         <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
-                          {MAIN_COURSES
-                            .filter(c => c.toLowerCase().includes((mainCourseSearch || '').toLowerCase()))
-                            .map((c, i) => (
+                          {studyPlans
+                            .filter(plan => plan.name.toLowerCase().includes((mainCourseSearch || '').toLowerCase()))
+                            .map((plan, i) => (
                               <div
-                                key={i}
+                                key={plan.id || i}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => {
-                                  setFormMainCourse(c);
+                                  setFormMainCourse(plan.name);
                                   setMainCourseSearch('');
                                   setFormSubject('');
                                   setSubjectSearch('');
                                   setIsMainCourseOpen(false);
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${formMainCourse === c ? 'bg-blue-100 font-bold' : ''}`}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${formMainCourse === plan.name ? 'bg-blue-100 font-bold' : ''}`}
                               >
-                                {c}
+                                <div className="font-medium">{plan.name}</div>
+                                <div className="text-xs text-gray-500">{plan.category} {plan.subcategory ? `• ${plan.subcategory}` : ''}</div>
                               </div>
                             ))}
                         </div>
@@ -962,20 +1117,20 @@ const CalendarView: React.FC = () => {
                       {isSubjectOpen && formMainCourse && (
                         <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto">
                           {availableSubjects
-                            .filter(s => s.name.toLowerCase().includes((subjectSearch || '').toLowerCase()))
+                            .filter(s => s.subject_name.toLowerCase().includes((subjectSearch || '').toLowerCase()))
                             .map((s, i) => (
                               <div
-                                key={i}
+                                key={s.id || i}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => {
-                                  setFormSubject(s.name);
+                                  setFormSubject(s.subject_name);
                                   setSubjectSearch('');
                                   setIsSubjectOpen(false);
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex justify-between ${formSubject === s.name ? 'bg-blue-100 font-bold' : ''}`}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex justify-between ${formSubject === s.subject_name ? 'bg-blue-100 font-bold' : ''}`}
                               >
-                                <span>{s.name}</span>
-                                <span className="text-gray-400 text-xs">{s.hours}h • {s.type}</span>
+                                <span>{s.subject_name}</span>
+                                <span className="text-gray-400 text-xs">{s.total_hours}h • {s.subject_type}</span>
                               </div>
                             ))}
                         </div>
@@ -1050,6 +1205,21 @@ const CalendarView: React.FC = () => {
                     <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Orario Fine</label>
                     <input type="time" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:border-nam-blue focus:outline-none" />
                   </div>
+                </div>
+
+                {/* Checkbox Lezione Ibrida */}
+                <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <input
+                    type="checkbox"
+                    id="isHybrid"
+                    checked={formIsHybrid}
+                    onChange={(e) => setFormIsHybrid(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="isHybrid" className="text-sm font-medium text-gray-700 cursor-pointer flex items-center">
+                    <i className="fas fa-video mr-2 text-blue-600"></i>
+                    Lezione Ibrida (crea automaticamente link Zoom)
+                  </label>
                 </div>
 
                 <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
@@ -1145,6 +1315,164 @@ const CalendarView: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DETTAGLIO LEZIONE --- */}
+      {showDetailModal && selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border-t-4 border-nam-blue animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-nam-blue px-8 py-6 border-b border-blue-100">
+              <h3 className="font-extrabold text-2xl text-white flex items-center">
+                <i className="fas fa-info-circle mr-3"></i>
+                Dettagli Lezione
+              </h3>
+            </div>
+            <div className="p-8">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-600 uppercase">Titolo</label>
+                  <p className="text-lg font-semibold text-gray-900">{selectedEvent.title}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-600 uppercase">Aula</label>
+                    <p className="text-gray-900">{selectedEvent.room}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-600 uppercase">Orario</label>
+                    <p className="text-gray-900">{selectedEvent.time}</p>
+                  </div>
+                </div>
+
+                {/* SEZIONE ZOOM */}
+                {selectedEvent.isHybrid && (
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                      <i className="fas fa-video mr-2"></i>
+                      Lezione Online
+                    </h4>
+
+                    {selectedEvent.zoom_link ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center text-green-600 text-sm">
+                          <i className="fas fa-check-circle mr-2"></i>
+                          <span>Link Zoom pronto</span>
+                        </div>
+
+                        {/* Link per studenti */}
+                        <div>
+                          <label className="text-xs text-gray-600 block mb-1">
+                            Link per Studenti:
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={selectedEvent.zoom_link}
+                              readOnly
+                              className="flex-1 px-3 py-2 text-sm border rounded bg-white"
+                            />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedEvent.zoom_link!);
+                                alert('Link copiato!');
+                              }}
+                              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium"
+                            >
+                              <i className="fas fa-copy"></i>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Link per docente */}
+                        {selectedEvent.zoom_host_link && (
+                          <div>
+                            <label className="text-xs text-gray-600 block mb-1">
+                              Link Host (Docente):
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={selectedEvent.zoom_host_link}
+                                readOnly
+                                className="flex-1 px-3 py-2 text-sm border rounded bg-white"
+                              />
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(selectedEvent.zoom_host_link!);
+                                  alert('Link docente copiato!');
+                                }}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium"
+                              >
+                                <i className="fas fa-copy"></i>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Password */}
+                        {selectedEvent.zoom_password && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Password:</strong> <code className="bg-gray-100 px-2 py-1 rounded">
+                              {selectedEvent.zoom_password}
+                            </code>
+                          </p>
+                        )}
+
+                        {/* Bottoni azione */}
+                        <div className="flex gap-2 mt-4">
+                          <a
+                            href={selectedEvent.zoom_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-sm"
+                          >
+                            <i className="fas fa-external-link-alt mr-2"></i>
+                            Apri Zoom
+                          </a>
+                        </div>
+                      </div>
+                    ) : selectedEvent.zoom_error ? (
+                      <div className="text-red-600">
+                        <div className="flex items-center mb-2">
+                          <i className="fas fa-exclamation-circle mr-2"></i>
+                          <span>Errore creazione link</span>
+                        </div>
+                        <p className="text-sm bg-red-50 p-2 rounded">
+                          {selectedEvent.zoom_error}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-yellow-600 flex items-center">
+                        <i className="fas fa-spinner fa-spin mr-2"></i>
+                        <span>Generazione link Zoom in corso...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 pt-4 border-t flex justify-between">
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium"
+                >
+                  Chiudi
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handleEditFromDetail(selectedEvent);
+                  }}
+                  className="px-6 py-2 bg-nam-green hover:bg-green-700 text-white rounded font-medium"
+                >
+                  <i className="fas fa-edit mr-2"></i>
+                  Modifica
+                </button>
+              </div>
             </div>
           </div>
         </div>
